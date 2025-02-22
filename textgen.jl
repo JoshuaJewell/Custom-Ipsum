@@ -4,10 +4,15 @@ text = read("sample.txt", String)
 text2 = read("sample2.txt", String)
 
 function encode(text, exclude=[" ", "(", ")", "\""], end_punctuation = [".", "!", "?"]; preserve_tokens=["'s", "'t", "'m", "'ve"])
-    preserve_pattern = join(Regex."$(preserve_tokens)"), "|"
+    # Escape each preserve token to handle regex special characters
+    escaped_tokens = map(t -> Regex.escape(t), preserve_tokens)
+    
+    # Create a regex pattern that matches word boundaries or non-word characters,
+    # but treats preserve_tokens as single units
+    preserve_pattern = join(escaped_tokens, "|")
     split_pattern = Regex("\\b(?:\\w+|$preserve_pattern)\\b|\\W+")
     
-    # Extract tokens while preserving original case and keeping preserve_tokens intact
+    # Split the text into tokens using the new pattern
     tokens = split(text, split_pattern, keepempty = false)
     
     # Remove excluded tokens
@@ -35,17 +40,20 @@ function encode(text, exclude=[" ", "(", ")", "\""], end_punctuation = [".", "!"
 
         # Determine if current_token appears in more than one case
         current_lower = lowercase(current_token)
-        group_size = length(get(groups, current_lower, []))
+        group_size = length(groups[current_lower])
         current_base = group_size > 1 ? current_lower : current_token
 
         # Determine if next_token appears in more than one case
         next_lower = lowercase(next_token)
-        next_group_size = length(get(groups, next_lower, []))
+        next_group_size = length(groups[next_lower])
         next_base = next_group_size > 1 ? next_lower : next_token
 
         # Update BOS transitions if current token is sentence-ending punctuation
         if current_base ∈ end_punctuation
-            markov_dict[init_token][next_base] = get(markov_dict[init_token], next_base, 0) + 1
+            if !haskey(markov_dict[init_token], next_base)
+                markov_dict[init_token][next_base] = 0
+            end
+            markov_dict[init_token][next_base] += 1
         end
 
         # Update regular transitions
@@ -53,7 +61,7 @@ function encode(text, exclude=[" ", "(", ")", "\""], end_punctuation = [".", "!"
             markov_dict[current_base] = Dict{String, Int}()
         end
 
-        markov_dict[current_base][next_base] = get(markov_dict[current_base], next_base, 0) + 1
+        markov_dict[current_base][next_base] += 1
     end
 
     return markov_dict
