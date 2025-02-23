@@ -1,9 +1,9 @@
-module
+module Tools
     include("encoder.jl")
 
     using .Encoder
 
-    export encode_multiple
+    export encode_multiple, merge_tensors
 
     """
         function encode_multiple(path_to_context = "./", context_filename = "sample", context_file_no = 12, output_tensordict_to)

@@ -1,9 +1,9 @@
 include("decoder.jl")
 include("encoder.jl")
-include("tensorsmerge.jl")
+include("tools.jl")
 
 using JLD2, Random
-using .Decoder, .Encoder, .TensorsMerge
+using .Decoder, .Encoder, .Tools
 
 Random.seed!(1234)
 
