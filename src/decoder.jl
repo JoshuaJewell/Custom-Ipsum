@@ -6,7 +6,7 @@ module Decoder
     export decode
 
     """
-    decode(tensors, mode = "default"; max_tokens = 128, beam_width = 3, stream = false, stream_rate = 1000)
+        decode(tensors, mode = "default"; max_tokens = 128, beam_width = 3, stream = false, stream_rate = 1000)
 
     Decode the given tensors using the specified mode.
 
