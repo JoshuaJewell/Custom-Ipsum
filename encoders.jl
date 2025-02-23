@@ -1,0 +1,111 @@
+module Encoders
+    include("helpers.jl")
+
+    using .Helpers
+
+    export defualt_encoder, sanger_encoder, encode_multiple
+
+    function sanger_encoder(context, fragment_size=1)
+        if fragment_size > 1
+            tokens = sanger_split(context, fragment_size)
+        else
+            fragment_size = round(average_word_length(context), digits = 0)
+            tokens = sanger_split(context, fragment_size)
+        end
+
+        # Initialize the Markov dictionary and BOS token
+        markov_dict = Dict{String, Dict{String, Float64}}()
+        init_token = "<BOS>"
+        markov_dict[init_token] = Dict{String, Float64}()
+
+        # Iterate through the tokens to build the Markov chain
+        for i in 1:length(tokens)-1
+            current_token = tokens[i]
+            next_token = tokens[i+1]
+            if !haskey(markov_dict, current_token)
+                markov_dict[current_token] = Dict{String, Float64}()
+            end
+            if !haskey(markov_dict[current_token], next_token)
+                markov_dict[current_token][next_token] = 0.0
+            end
+            markov_dict[current_token][next_token] += 1.0
+
+            progress = round(100 * i / length(tokens), digits = 2)
+            print("\x1b[2K\r$progress% complete. Current token: $(filter(c -> c != '\n', current_token))...")
+            flush(stdout)
+
+            if current_token in ["."]
+                markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
+            else
+                if !haskey(markov_dict, current_token)
+                    markov_dict[current_token] = Dict{String, Float64}()
+                end
+                markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
+            end
+        
+        end
+
+        return markov_dict
+    end
+
+    function default_encoder(context, end_punctuation = [".", "!", "?"], exclude=[" ", "(", ")", "\"", "*"]; preserve_tokens=["'s", "'t", "'m", "'ve"])    
+        # Extract tokens while preserving original case
+        tokens = split(context, r"\b|\W+", keepempty = false)
+
+        # Remove excluded tokens
+        filter!(x -> !(x in exclude), tokens)
+
+        # Initialize the Markov dictionary and BOS token
+        markov_dict = Dict{String, Dict{String, Float64}}()
+        init_token = "<BOS>"
+        markov_dict[init_token] = Dict{String, Float64}()
+
+        # Iterate through the tokens to build the Markov chain
+        for i in 1:length(tokens)-1
+            current_token = tokens[i]
+            next_token = tokens[i+1]
+            if !haskey(markov_dict, current_token)
+                markov_dict[current_token] = Dict{String, Float64}()
+            end
+            if !haskey(markov_dict[current_token], next_token)
+                markov_dict[current_token][next_token] = 0.0
+            end
+            markov_dict[current_token][next_token] += 1.0
+
+            if current_token in end_punctuation
+                markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
+            else
+                if !haskey(markov_dict, current_token)
+                    markov_dict[current_token] = Dict{String, Float64}()
+                end
+                markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
+            end
+
+            progress = round(100 * i / length(tokens), digits = 2)
+            print("\x1b[2K\r$progress% complete. Current token: $current_token...")
+        end
+
+        return markov_dict
+    end
+
+    function encode_multiple(context_filename="sample", context_file_no=12)
+        contexts = []
+        for i in 1:context_file_no
+            context = read("$context_filename$i.txt", String)
+            push!(contexts, context)
+        end
+
+        tensors = [encode(context) for context in contexts]
+
+        merged_tensors = tensors[1]
+
+        for i in eachindex(tensors[2:end])
+            ratio = 1.0 / i
+            merged_tensors = merge_tensors(merged_tensors, tensors[i + 1], ratio)
+        end
+
+        jldopen("sample.tensors", "w") do file
+            file["data"] = merged_tensors
+        end
+    end
+end
