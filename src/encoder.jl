@@ -115,25 +115,4 @@ module Encoder
 
         return markov_dict
     end
-
-    function encode_multiple(context_filename="sample", context_file_no=12)
-        contexts = []
-        for i in 1:context_file_no
-            context = read("$context_filename$i.txt", String)
-            push!(contexts, context)
-        end
-
-        tensors = [encode(context) for context in contexts]
-
-        merged_tensors = tensors[1]
-
-        for i in eachindex(tensors[2:end])
-            ratio = 1.0 / i
-            merged_tensors = merge_tensors(merged_tensors, tensors[i + 1], ratio)
-        end
-
-        jldopen("sample.tensors", "w") do file
-            file["data"] = merged_tensors
-        end
-    end
 end
