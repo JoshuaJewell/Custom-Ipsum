@@ -93,24 +93,25 @@ function merge_embeddings(d1::Dict{String, Dict{String, Float64}}, d2::Dict{Stri
     return merged
 end
 
-contexts = []
-for i in 1:12
-    context = read("sample$i.txt", String)
-    push!(contexts, context)
-end
+function encode_multiple(context_filename="sample", context_file_no=12)
+    contexts = []
+    for i in 1:context_file_no
+        context = read("$context_filename$i.txt", String)
+        push!(contexts, context)
+    end
 
-embeddings = [encode(context) for context in contexts]
+    embeddings = [encode(context) for context in contexts]
 
-merged_embedding = embeddings[1]
+    merged_embedding = embeddings[1]
 
-# Use `eachindex` to loop over the indices safely
-for i in eachindex(embeddings[2:end])
-    ratio = 1.0 / i
-    global merged_embedding = merge_embeddings(merged_embedding, embeddings[i + 1], ratio)
-end
+    for i in eachindex(embeddings[2:end])
+        ratio = 1.0 / i
+        merged_embedding = merge_embeddings(merged_embedding, embeddings[i + 1], ratio)
+    end
 
-jldopen("sample.embedding", "w") do file
-    file["data"] = merged_embedding
+    jldopen("sample.embedding", "w") do file
+        file["data"] = merged_embedding
+    end
 end
 
 function recapitalise!(text)
@@ -124,6 +125,7 @@ function recapitalise!(text)
     end
     return text
 end
+
 
 function decode(embedding, max_tokens=128, stream=false, stream_rate=0)
     if max_tokens == 0
@@ -212,11 +214,13 @@ function decode(embedding, max_tokens=128, stream=false, stream_rate=0)
     end
 end
 
-Random.seed!(123)
+# encode_multiple()
+
+Random.seed!(1234)
 
 sampleembedding = jldopen("sample.embedding", "r") do file
     file["data"]
 end
 
-generated_text = decode(sampleembedding, 128, false, 1000)
+generated_text = decode(sampleembedding, 128, true, 1000)
 println(generated_text)
