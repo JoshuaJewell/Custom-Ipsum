@@ -1,9 +1,39 @@
-module Decoders
+module Decoder
     include("helpers.jl")
 
     using .Helpers
 
-    export default_decoder, beam_search_decoder
+    export decode
+
+    """
+    decode(tensors, mode = "default"; max_tokens = 128, beam_width = 3, stream = false, stream_rate = 1000)
+
+    Decode the given tensors using the specified mode.
+
+    ## Arguments
+    - `tensors`: The input tensors to decode.
+    - `mode` (optional, default: "default"): The decoding mode. Can be "default", "sanger", or "beamsearch".
+    
+    ## Keyword Arguments
+    - `max_tokens` (optional, default: 128): Maximum number of tokens to decode.
+    - `beam_width` (optional, default: 3): Beam width for beam search decoding. Only relevant if `mode` is "beamsearch".
+    - `stream` (optional, default: false): Whether to stream the output. Only relevant if `mode` is "sanger" or "default".
+    - `stream_rate` (optional, default: 1000): How quickly to stream output. Set to 0 for infinite. Only relevant if `mode` is "sanger" or "default".
+    """
+    function decode(tensors, mode = "default"; max_tokens = 128, beam_width = 3, stream = false, stream_rate = 1000)
+        initT = time()
+        mode = lowercase(mode)
+        
+        if mode == "sanger"
+            sanger_decoder(tensors, max_tokens, stream, stream_rate)
+        elseif mode == "beamsearch"
+            beam_search_decoder(tensors, max_tokens, beam_width)
+        else
+            default_decoder(tensors, max_tokens, stream, stream_rate)
+        end
+        
+        println("\nDecoded in $(time() - initT) s")
+    end
 
     function default_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
         if max_tokens == 0
@@ -51,13 +81,91 @@ module Decoders
             end
 
             # Add space unless it's punctuation
-            #if selected_token ∉ [".", "!", "?", ",", "’", "'", ":", ";", "—", "/", "s", "t", "m", "d", "ve", "…"] && !init_token
-            #    push!(text, " ")
-            #    if stream
-            #        print(" ")
-            #        flush(stdout)
-            #    end
-            #end
+            if selected_token ∉ [".", "!", "?", ",", "’", "'", ":", ";", "—", "/", "s", "t", "m", "d", "ve", "…"] && !init_token
+                push!(text, " ")
+                if stream
+                    print(" ")
+                    flush(stdout)
+                end
+            end
+
+            current_token = selected_token
+            push!(text, current_token)
+
+            if stream
+                if capitalise_next
+                    stream_token = uppercase(current_token[1]) * lowercase(current_token[2:end])
+                    capitalise_next = false
+                else
+                    stream_token = current_token
+                end
+
+                if init_token == true
+                    stream_token = uppercase(stream_token[1]) * lowercase(stream_token[2:end])
+                end
+
+                if current_token ∈ [".", "!", "?"]
+                    capitalise_next = true
+                end
+
+                if stream_token !== nothing
+                    sleep(stream_rate)
+                    print(stream_token)
+                    flush(stdout)
+                end
+            end
+            init_token = false
+        end
+        if !stream
+            recapitalise!(text)
+            return join(text)
+        end
+    end
+
+    function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
+        if max_tokens == 0
+            return ""
+        end
+
+        text = []
+        current_token = "<BOS>"
+        init_token = true
+
+        if stream
+            capitalise_next = true
+            if stream_rate > 0
+                stream_rate = 1 / stream_rate
+            end
+        end
+
+        for i in 2:max_tokens
+            if !haskey(tensors, current_token)
+                break
+            end
+
+            next_options = tensors[current_token]
+            next_tokens = collect(keys(next_options))
+            weights = map(w -> next_options[w], next_tokens)
+
+            # Normalize weights to probabilities
+            total = sum(weights)
+            if total == 0
+                probs = fill(1.0 / max_tokens(next_tokens), max_tokens(next_tokens))
+            else
+                probs = weights ./ total
+            end
+
+            # Generate a random number and select the next token based on cumulative probabilities
+            r = rand()
+            cumulative = 0.0
+            selected_token = ""
+            for (idx, token) in enumerate(next_tokens)
+                cumulative += probs[idx]
+                if cumulative >= r
+                    selected_token = token
+                    break
+                end
+            end
 
             current_token = selected_token
             push!(text, current_token)
