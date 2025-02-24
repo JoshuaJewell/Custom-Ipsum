@@ -40,8 +40,10 @@ module Decoder
         end
         
         println("\nDecoded in $(time() - initT) s")
-
-        return output
+        
+        if !stream
+            return output
+        end
     end
 
     function default_decoder(
@@ -136,12 +138,7 @@ module Decoder
         end
     end
 
-    function sanger_decoder(
-        tensors,
-        max_tokens=128,
-        stream=false,
-        stream_rate=0
-    )
+    function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
         if max_tokens == 0
             return ""
         end
@@ -151,7 +148,6 @@ module Decoder
         init_token = true
 
         if stream
-            capitalise_next = true
             if stream_rate > 0
                 stream_rate = 1 / stream_rate
             end
@@ -169,7 +165,7 @@ module Decoder
             # Normalize weights to probabilities
             total = sum(weights)
             if total == 0
-                probs = fill(1.0 / max_tokens(next_tokens), max_tokens(next_tokens))
+                probs = fill(1.0 / length(next_tokens), length(next_tokens))
             else
                 probs = weights ./ total
             end
@@ -190,12 +186,7 @@ module Decoder
             push!(text, current_token)
 
             if stream
-                if capitalise_next
-                    stream_token = uppercase(current_token[1]) * lowercase(current_token[2:end])
-                    capitalise_next = false
-                else
-                    stream_token = current_token
-                end
+                stream_token = current_token
 
                 if init_token == true
                     stream_token = uppercase(stream_token[1]) * lowercase(stream_token[2:end])
@@ -214,7 +205,6 @@ module Decoder
             init_token = false
         end
         if !stream
-            recapitalise!(text)
             return join(text)
         end
     end
