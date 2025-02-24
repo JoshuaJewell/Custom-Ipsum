@@ -19,15 +19,19 @@ module Tools
     - `context_file_no` (default: 2): The number of context files, indexed from 1.
 
     ## Keyword Arguments
-    - `mode` (optional, default: "equal"): The merging mode. Can be "equal", or "weighted". (WIP)
+    - `merge_mode` (optional, default: "equal"): The merging mode. Can be "equal", or "weighted". (WIP)
+    - `encoder_mode` (optional, default: "default"): The encoder mode. Can be "default", or "sanger".
+
     """
     function encode_multiple(
         path_to_context = "../data/contexts/",
         context_filename = "context",
         context_file_no = 2;
-        mode = "equal"
+        merge_mode = "equal",
+        encoder_mode = "default"
     )
-        mode = lowercase(mode)
+        merge_mode = lowercase(merge_mode)
+        encoder_mode = lowercase(encoder_mode)
 
         contexts = []
         for i in 1:context_file_no
@@ -35,7 +39,7 @@ module Tools
             push!(contexts, context)
         end
 
-        tensors = [encode(context) for context in contexts]
+        tensors = [encode(context, encoder_mode) for context in contexts]
 
         merged_tensors = tensors[1]
 
