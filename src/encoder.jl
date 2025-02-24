@@ -100,6 +100,7 @@ module Encoder
         # Initialize the Markov dictionary and BOS token
         markov_dict = Dict{String, Dict{String, Float64}}()
         init_token = "<BOS>"
+        pushfirst!(tokens, "\n")
         markov_dict[init_token] = Dict{String, Float64}()
 
         # Iterate through the tokens to build the Markov chain
@@ -117,7 +118,8 @@ module Encoder
             progress = round(100 * i / length(tokens), digits = 2)
             print("\x1b[2K\r$progress% complete. Current token: $(filter(c -> c != '\n', current_token))...")
 
-            if current_token in ["."]
+            #if endswith(current_token, "\n")
+            if i == 1
                 markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
             else
                 if !haskey(markov_dict, current_token)
