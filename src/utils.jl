@@ -1,4 +1,4 @@
-module Helpers
+module Utils
 
     export average_word_length, sanger_split, recapitalise!
 
@@ -31,7 +31,7 @@ module Helpers
 
         for i in 1:fragment_groups
 
-            fragment_size = fragment_groups * 2
+            fragment_size = fragment_groups * i
             
             for offset::Int64 in 1:fragment_size
                 current_pos = offset

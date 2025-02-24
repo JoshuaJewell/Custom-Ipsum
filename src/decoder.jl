@@ -1,7 +1,8 @@
 module Decoder
-    include("helpers.jl")
+    include("types.jl")
+    include("utils.jl")
 
-    using .Helpers
+    using .Types, .Utils 
 
     export decode
 
@@ -12,7 +13,6 @@ module Decoder
 
     ## Arguments
     - `tensors`: The input tensors to decode.
-    - `mode` (optional, default: "default"): The decoding mode. Can be "default", "sanger", or "beamsearch".
     
     ## Keyword Arguments
     - `max_tokens` (optional, default: 128): Maximum number of tokens to decode.
@@ -21,22 +21,23 @@ module Decoder
     - `stream_rate` (optional, default: 1000): How quickly to stream output. Set to 0 for infinite. Only relevant if `mode` is "sanger" or "default".
     """
     function decode(
-        tensors,
-        mode = "default";
+        tensors;
         max_tokens = 128,
         beam_width = 3,
         stream = false,
         stream_rate = 1000
     )
         initT = time()
-        mode = lowercase(mode)
-        
+
+        mode = tensors.header.encoding_method
+
+        println("Decoding in $(mode) mode.")
         if mode == "sanger"
-            output = sanger_decoder(tensors, max_tokens, stream, stream_rate)
+            output = sanger_decoder(tensors.forward_markov, max_tokens, stream, stream_rate)
         elseif mode == "beamsearch"
-            output = beam_search_decoder(tensors, max_tokens, beam_width)
+            output = beam_search_decoder(tensors.forward_markov, max_tokens, beam_width)
         else
-            output = default_decoder(tensors, max_tokens, stream, stream_rate)
+            output = default_decoder(tensors.forward_markov, max_tokens, stream, stream_rate)
         end
         
         println("\nDecoded in $(time() - initT) s")

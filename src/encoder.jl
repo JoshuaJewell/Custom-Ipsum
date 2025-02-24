@@ -1,7 +1,8 @@
 module Encoder
-    include("helpers.jl")
+    include("types.jl")
+    include("utils.jl")
 
-    using .Helpers
+    using .Types, .Utils
 
     export encode
 
@@ -27,6 +28,9 @@ module Encoder
         exclude = [" ", "(", ")", "\"", "*"], 
         fragment_size = 1
     )
+        mode = lowercase(mode)    
+
+        println("Encoding in $mode mode.")
         initT = time()
         mode = lowercase(mode)
         
@@ -38,7 +42,14 @@ module Encoder
 
         println("\nEncoded in $(time() - initT) s")
 
-        return markov_dict
+        tensors = CompleteTensors(
+            Header(mode, ""),
+            markov_dict,
+            Dict{String, Dict{String, Float64}}(), 
+            [""]
+        )
+
+        return tensors
     end
 
     function default_encoder(
