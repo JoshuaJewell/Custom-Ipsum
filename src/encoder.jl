@@ -6,7 +6,7 @@ module Encoder
     export encode
 
     """
-        encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
+        encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
     
     Encode the given context using the specified mode.
 
@@ -16,24 +16,36 @@ module Encoder
     
     ## Keyword Arguments
     - `end_punctuation` (optional, default: [".", "!", "?"]): Markers for ends of sentences. Only relevant if `mode` is "default".
-    - `exclude` (optional, default: [" ", "(", ")", "\"", "*"]): Tokens to exclude from tensordict. Only relevant if `mode` is "default".
-    - `preserve_tokens` (optional, default: [" ", "(", ")", "\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
-    - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sagner".
+    - `exclude` (optional, default: [" ", "(", ")", "\\"", "*"]): Tokens to exclude from tensordict. Only relevant if `mode` is "default".
+    - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
+    - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     """
-    function encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
+    function encode(
+        context,
+        mode = "default";
+        end_punctuation = [".", "!", "?"], 
+        exclude = [" ", "(", ")", "\"", "*"], 
+        fragment_size = 1
+    )
         initT = time()
         mode = lowercase(mode)
         
         if mode == "sanger"
-            sanger_encoder(context, fragment_size = 1)
+            markov_dict = sanger_encoder(context, fragment_size = fragment_size)
         else
-            default_encoder(context, end_punctuation, exclude, preserve_tokens)
+            markov_dict = default_encoder(context, end_punctuation, exclude)
         end
 
         println("\nEncoded in $(time() - initT) s")
+
+        return markov_dict
     end
 
-    function default_encoder(context; end_punctuation = [".", "!", "?"], exclude=[" ", "(", ")", "\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve"])    
+    function default_encoder(
+        context,
+        end_punctuation = [".", "!", "?"],
+        exclude=[" ", "(", ")", "\"", "*"],
+    )    
         # Extract tokens while preserving original case
         tokens = split(context, r"\b|\W+", keepempty = false)
 
@@ -69,11 +81,15 @@ module Encoder
             progress = round(100 * i / length(tokens), digits = 2)
             print("\x1b[2K\r$progress% complete. Current token: $current_token...")
         end
+        print("\x1b[2K\r100% complete.")
 
         return markov_dict
     end
 
-    function sanger_encoder(context; fragment_size=1)
+    function sanger_encoder(
+        context;
+        fragment_size=1
+    )
         if fragment_size > 1
             tokens = sanger_split(context, fragment_size)
         else
@@ -100,7 +116,6 @@ module Encoder
 
             progress = round(100 * i / length(tokens), digits = 2)
             print("\x1b[2K\r$progress% complete. Current token: $(filter(c -> c != '\n', current_token))...")
-            flush(stdout)
 
             if current_token in ["."]
                 markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
@@ -109,9 +124,9 @@ module Encoder
                     markov_dict[current_token] = Dict{String, Float64}()
                 end
                 markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
-            end
-        
+            end            
         end
+        print("\x1b[2K\r100% complete.")
 
         return markov_dict
     end

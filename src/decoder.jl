@@ -20,22 +20,36 @@ module Decoder
     - `stream` (optional, default: false): Whether to stream the output. Only relevant if `mode` is "sanger" or "default".
     - `stream_rate` (optional, default: 1000): How quickly to stream output. Set to 0 for infinite. Only relevant if `mode` is "sanger" or "default".
     """
-    function decode(tensors, mode = "default"; max_tokens = 128, beam_width = 3, stream = false, stream_rate = 1000)
+    function decode(
+        tensors,
+        mode = "default";
+        max_tokens = 128,
+        beam_width = 3,
+        stream = false,
+        stream_rate = 1000
+    )
         initT = time()
         mode = lowercase(mode)
         
         if mode == "sanger"
-            sanger_decoder(tensors, max_tokens, stream, stream_rate)
+            output = sanger_decoder(tensors, max_tokens, stream, stream_rate)
         elseif mode == "beamsearch"
-            beam_search_decoder(tensors, max_tokens, beam_width)
+            output = beam_search_decoder(tensors, max_tokens, beam_width)
         else
-            default_decoder(tensors, max_tokens, stream, stream_rate)
+            output = default_decoder(tensors, max_tokens, stream, stream_rate)
         end
         
         println("\nDecoded in $(time() - initT) s")
+
+        return output
     end
 
-    function default_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
+    function default_decoder(
+        tensors,
+        max_tokens=128,
+        stream=false,
+        stream_rate=0
+    )
         if max_tokens == 0
             return ""
         end
@@ -122,7 +136,12 @@ module Decoder
         end
     end
 
-    function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
+    function sanger_decoder(
+        tensors,
+        max_tokens=128,
+        stream=false,
+        stream_rate=0
+    )
         if max_tokens == 0
             return ""
         end
@@ -200,7 +219,11 @@ module Decoder
         end
     end
 
-    function beam_search_decoder(tensors, max_tokens=128, beam_width=3)
+    function beam_search_decoder(
+        tensors,
+        max_tokens=128,
+        beam_width=3
+    )
         if max_tokens == 0
             return ""
         end
