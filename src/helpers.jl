@@ -2,7 +2,10 @@ module Helpers
 
     export average_word_length, sanger_split, recapitalise!
 
-    function average_word_length(text::String, smallest_word=3)
+    function average_word_length(
+        text::String,
+        smallest_word=3
+    )
         # Split the text into words
         words = split(text)
         filter!(word -> length(word) >= smallest_word, words)
@@ -18,28 +21,37 @@ module Helpers
         return total_letters / total_words
     end
 
-    function sanger_split(context, fragment_size=12)
+    function sanger_split(
+        context,
+        fragment_size = 12,
+        fragment_groups = 1,
+    )
         n = ncodeunits(context)  # Use ncodeunits to get the number of code units
         result = Vector{String}()  # Initialize a flat result array
 
-        for offset::Int64 in 1:fragment_size
-            current_pos = offset
-            while current_pos <= n
-                # Calculate the end position of the fragment
-                end_pos = current_pos
-                for _ in 1:(fragment_size - 1)
-                    if end_pos > n
-                        break
+        for i in 1:fragment_groups
+
+            fragment_size = fragment_groups * 2
+            
+            for offset::Int64 in 1:fragment_size
+                current_pos = offset
+                while current_pos <= n
+                    # Calculate the end position of the fragment
+                    end_pos = current_pos
+                    for _ in 1:(fragment_size - 1)
+                        if end_pos > n
+                            break
+                        end
+                        end_pos = nextind(context, end_pos)
                     end
-                    end_pos = nextind(context, end_pos)
+
+                    # Extract the fragment
+                    token = context[current_pos:prevind(context, end_pos)]
+                    push!(result, token)  # Directly push the token to the flat result array
+
+                    # Move to the next starting position
+                    current_pos = nextind(context, end_pos - 1)
                 end
-
-                # Extract the fragment
-                token = context[current_pos:prevind(context, end_pos)]
-                push!(result, token)  # Directly push the token to the flat result array
-
-                # Move to the next starting position
-                current_pos = nextind(context, end_pos - 1)
             end
         end
 

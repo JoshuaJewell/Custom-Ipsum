@@ -13,9 +13,9 @@ Random.seed!(12345)
 #     file["data"]
 # end
 
-#print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
+print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
 
-context = read("./data/contexts/localsample1.txt", String)
-dict = encode(context, "sanger")
-print(decode(dict, "sanger", stream=true))
+#context = read("./data/contexts/localsample1.txt", String)
+#dict = encode(context, "sanger")
+#print(decode(dict, "sanger", stream=true))
