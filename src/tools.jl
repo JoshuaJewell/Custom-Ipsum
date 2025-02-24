@@ -6,7 +6,7 @@ module Tools
     export encode_multiple, merge_tensors
 
     """
-        function encode_multiple(path_to_context = "./", context_filename = "sample", context_file_no = 12, output_tensordict_to)
+        function encode_multiple(path_to_context = "../data/contexts/", context_filename = "context", context_file_no; mode = "equal")
     
     Encodes multiple contexts from a set of files and merges the weights. Store contexts in format:
         context1.txt
@@ -14,14 +14,19 @@ module Tools
         etc...
 
     ## Arguments
-    - `path_to_context` (default: "./"): Where your context files to encode and merge are.
+    - `path_to_context` (default: "../data/contexts/"): Where your context files to encode and merge are.
     - `context_filename` (default: "context"): The unchanged part of your contexts' filenames.
-    - `context_file_no`: The number of context files, indexed from 1.
+    - `context_file_no` (default: 2): The number of context files, indexed from 1.
 
     ## Keyword Arguments
     - `mode` (optional, default: "equal"): The merging mode. Can be "equal", or "weighted". (WIP)
     """
-    function encode_multiple(path_to_context = "./", context_filename = "context", context_file_no; mode = "equal")
+    function encode_multiple(
+        path_to_context = "../data/contexts/",
+        context_filename = "context",
+        context_file_no = 2;
+        mode = "equal"
+    )
         mode = lowercase(mode)
 
         contexts = []
@@ -36,7 +41,7 @@ module Tools
 
         for i in eachindex(tensors[2:end])
             ratio = 1.0 / i
-            merged_tensors = merge_tensors(merged_tensors, tensors[i + 1], ratio)
+            merged_tensors = merge_tensors(merged_tensors, tensors[i + 1], "weighted", ratio = ratio)
         end
 
         return merged_tensors
@@ -55,7 +60,12 @@ module Tools
     - `ratio` (optional, default: 0.5): The ratio by which. Only relevant if `mode` is "ratio".
     - `mode` (optional, default: "weighted"): The merging mode. Can be "ratio", or "weighted". (WIP)
     """
-    function merge_tensors(d1::Dict{String, Dict{String, Float64}}, d2::Dict{String, Dict{String, Float64}}; mode = "weighted", ratio::Float64 = 0.5)
+    function merge_tensors(
+        d1::Dict{String, Dict{String, Float64}},
+        d2::Dict{String, Dict{String, Float64}},
+        mode = "weighted";
+        ratio::Float64 = 0.5
+    )
         mode = lowercase(mode)
 
         merged_tensors = deepcopy(d1)
@@ -74,7 +84,11 @@ module Tools
         return merged_tensors
     end
 
-    function merge_inner_merge_tensors(d1::Dict{String, Float64}, d2::Dict{String, Float64}, ratio::Float64)
+    function merge_inner_merge_tensors(
+        d1::Dict{String, Float64},
+        d2::Dict{String, Float64},
+        ratio::Float64
+    )
         merged_inner = Dict{String, Float64}()
 
         # Get all unique keys from both dictionaries
