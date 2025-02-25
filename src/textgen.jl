@@ -2,20 +2,29 @@ include("decoder.jl")
 include("encoder.jl")
 include("tools.jl")
 
-using JLD2, Random
+using Random, Serialization
+
 using .Decoder, .Encoder, .Tools
 
-Random.seed!(12345)
+Random.seed!(123)
 
 # Reading from data
 # finewebcontext = read("./data/contexts/fineweb-top5000.txt", String)
-# finewebtensors = jldopen("./data/tensordicts/fineweb-top5000.tensordict", "r") do file
-#     file["data"]
-# end
+ 
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
 
-context = read("./data/contexts/localsample1.txt", String)
-tensors = encode(context, "default")
-print(decode(tensors))
+context = read("./data/contexts/localreddwarf.txt", String)
+
+tensors = encode(context, "sanger", fragment_groups = 2)
+
+open("./data/tensordicts/macbeth.tensordict", "w") do file
+    serialize(file, tensors)
+end
+
+tensors = open("./data/tensordicts/macbeth.tensordict", "r") do file
+    deserialize(file)
+end
+
+print(decode(tensors, max_tokens=1024))
