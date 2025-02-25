@@ -26,7 +26,8 @@ module Encoder
         mode = "default";
         end_punctuation = [".", "!", "?"], 
         exclude = [" ", "(", ")", "\"", "*"], 
-        fragment_size = 1
+        fragment_size = 1,
+        fragment_groups = 1
     )
         mode = lowercase(mode)    
 
@@ -35,15 +36,17 @@ module Encoder
         mode = lowercase(mode)
         
         if mode == "sanger"
-            markov_dict = sanger_encoder(context, fragment_size = fragment_size)
+            markov_dict = sanger_encoder(context, fragment_size, fragment_groups)
+            args = "Fragmentation: $fragment_size by $fragment_groups."
         else
             markov_dict = default_encoder(context, end_punctuation, exclude)
+            args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens."
         end
 
         println("\nEncoded in $(time() - initT) s")
 
         tensors = CompleteTensors(
-            Header(mode, ""),
+            Header(mode, args),
             markov_dict,
             Dict{String, Dict{String, Float64}}(), 
             [""]
@@ -98,20 +101,21 @@ module Encoder
     end
 
     function sanger_encoder(
-        context;
-        fragment_size=1
+        context,
+        fragment_size = 1,
+        fragment_groups = 1
     )
         if fragment_size > 1
-            tokens = sanger_split(context, fragment_size)
+            tokens = sanger_split(context, fragment_size, fragment_groups)
         else
             fragment_size = round(average_word_length(context), digits = 0)
-            tokens = sanger_split(context, fragment_size)
+            tokens = sanger_split(context, fragment_size, fragment_groups)
         end
 
         # Initialize the Markov dictionary and BOS token
         markov_dict = Dict{String, Dict{String, Float64}}()
         init_token = "<BOS>"
-        pushfirst(tokens, "\n")
+        pushfirst!(tokens, "\n")
         markov_dict[init_token] = Dict{String, Float64}()
 
         # Iterate through the tokens to build the Markov chain
