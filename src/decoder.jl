@@ -150,7 +150,7 @@ module Decoder
 
                 if stream_token!== nothing
                     if show_tokens
-                        print(stream_token, " \$($prob)")
+                        print(stream_token, "\$$(prob)")
                     else
                         print(stream_token)
                     end
@@ -161,7 +161,7 @@ module Decoder
         end
         if !stream
             if show_tokens
-                return join(text, " \$")
+                return join(text, "\n\$")
             else
                 return join(text)
             end
