@@ -20,7 +20,7 @@ module Encoder
     - `exclude` (optional, default: [" ", "(", ")", "\\"", "*"]): Tokens to exclude from tensordict. Only relevant if `mode` is "default".
     - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
-    - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger".
+    - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified - it's a feature, not a bug ;).
     """
     function encode(
         context,
@@ -108,14 +108,14 @@ module Encoder
         if fragment_size > 1
             tokens = sanger_split(context, fragment_size, fragment_groups)
         else
-            fragment_size = round(average_word_length(context), digits = 0)
+            fragment_size = Int(round(average_word_length(context), digits = 0))
             tokens = sanger_split(context, fragment_size, fragment_groups)
         end
 
         # Initialize the Markov dictionary and BOS token
         markov_dict = Dict{String, Dict{String, Float64}}()
         init_token = "<BOS>"
-        pushfirst!(tokens, "\n")
+        pushfirst!(tokens)
         markov_dict[init_token] = Dict{String, Float64}()
 
         # Iterate through the tokens to build the Markov chain

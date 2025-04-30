@@ -17,34 +17,40 @@ module Utils
         return total_letters / total_words
     end
 
-    function sanger_split(
-        context,
-        fragment_size,
-        fragment_groups = 1
-    )
+    function sanger_split(context, fragment_size, fragment_groups = 1)
         result = []
-
+        
+        # Do regular split (creates associations between fragments of the same group)
         for group in 1:fragment_groups
             push!(result, "\n")
             group_array = sanger_split_base(context, fragment_size)
             append!(result, group_array)
-            fragment_size += group
+            fragment_size += 1
         end
-
+    
+        # Do alternating split (creates associations between fragments of different groups)
+        sizes = fragment_size:(fragment_size + fragment_groups - 1)
+        if fragment_groups > 1
+            for size1 in sizes
+                for size2 in sizes
+                    if size1 != size2
+                        alt_array = sanger_split_alt(context, size1, size2)
+                        append!(result, alt_array)
+                    end
+                end
+            end
+        end
+    
         return result
     end
-
-    function sanger_split_base(
-        context,
-        fragment_size
-    )
-        n = ncodeunits(context) 
+    
+    function sanger_split_base(context, fragment_size)
+        n = ncodeunits(context)
         result = Vector{String}()
-
-        for offset::Int64 in 1:fragment_size
+    
+        for offset in 1:fragment_size
             current_pos = offset
             while current_pos <= n
-                # Calculate the end position of the fragment
                 end_pos = current_pos
                 for _ in 1:(fragment_size - 1)
                     if end_pos > n
@@ -52,16 +58,43 @@ module Utils
                     end
                     end_pos = nextind(context, end_pos)
                 end
-
-                # Extract the fragment
+    
                 token = context[current_pos:prevind(context, end_pos)]
-                push!(result, token) 
-                
-                # Move to the next starting position
+                push!(result, token)
                 current_pos = nextind(context, end_pos - 1)
             end
         end
-
+    
+        return result
+    end
+    
+    function sanger_split_alt(context, size1, size2)
+        n = ncodeunits(context)
+        result = Vector{String}()
+    
+        for offset in 1:min(size1, size2)
+            current_pos = offset
+            current_size_idx = 1
+            sizes = [size1, size2]
+    
+            while current_pos <= n
+                current_size = sizes[current_size_idx]
+                end_pos = current_pos
+                for _ in 1:(current_size - 1)
+                    if end_pos > n
+                        break
+                    end
+                    end_pos = nextind(context, end_pos)
+                end
+    
+                token = context[current_pos:prevind(context, end_pos)]
+                push!(result, token)
+                current_pos = nextind(context, end_pos - 1)
+    
+                current_size_idx = 3 - current_size_idx  # Toggle between 1 and 2
+            end
+        end
+    
         return result
     end
 

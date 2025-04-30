@@ -23,12 +23,12 @@ context = read("./data/contexts/localcontext.txt", String)
 #    serialize(file, tensors)
 #end
 
-tensors = open("./data/tensordicts/localtensors.tensordict", "r") do file
-    deserialize(file)
-end
+#tensors = open("./data/tensordicts/localtensors.tensordict", "r") do file
+#    deserialize(file)
+#end
 
 #tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
         
-print(encoder_decoder(context, "sanger", fragment_groups = 6, temperature=0.1, stream=true, show_tokens=true))
+print(encoder_decoder(context, "sanger", fragment_size = 4, fragment_groups = 8, temperature=0.8, stream=false, show_tokens=true, max_tokens=256))
 
 # discard 'clean' cuts might help preserve coherence?
