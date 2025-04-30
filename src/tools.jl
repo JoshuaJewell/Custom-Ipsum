@@ -1,9 +1,33 @@
 module Tools
     include("encoder.jl")
+    include("decoder.jl")
 
-    using .Encoder
+    using .Encoder, .Decoder
 
-    export encode_multiple, merge_tensors
+    export encode_multiple, merge_tensors, encoder_decoder
+
+    function encoder_decoder(
+        context,
+        mode = "default";
+        end_punctuation = [".", "!", "?"], 
+        exclude = [" ", "(", ")", "\"", "*"], 
+        fragment_size = 1,
+        fragment_groups = 1,
+        max_tokens = 128,
+        stream = false,
+        stream_rate = 1000,
+        show_tokens = false,
+        temperature = 0
+    )
+    return decode(
+        encode(context, mode, end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
+        max_tokens=max_tokens,
+        stream=stream,
+        stream_rate=stream_rate,
+        show_tokens=show_tokens,
+        temperature=temperature
+    )
+end
 
     """
         function encode_multiple(path_to_context = "../data/contexts/", context_filename = "context", context_file_no; mode = "equal")
