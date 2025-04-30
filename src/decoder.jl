@@ -12,20 +12,24 @@ module Decoder
     Decode the given tensors using the specified mode.
 
     ## Arguments
-    - `tensors`: The input tensors to decode.
+    - `tensors`: The input tensors to decode from.
     
     ## Keyword Arguments
     - `max_tokens` (optional, default: 128): Maximum number of tokens to decode.
     - `beam_width` (optional, default: 3): Beam width for beam search decoding. Only relevant if `mode` is "beamsearch".
     - `stream` (optional, default: false): Whether to stream the output. Only relevant if `mode` is "sanger" or "default".
     - `stream_rate` (optional, default: 1000): How quickly to stream output. Set to 0 for infinite. Only relevant if `mode` is "sanger" or "default".
+    - `show_tokens` (optional, default: false): Marks tokens in output, will also print token probability if `stream` is true. Only relevant if `mode` is "sanger".
+    - `temperature` (optional, default: 1): Sets the temperature of the sampler, higher values increase diversity and lower values increase confidence. Only relevant if `mode` is "sanger" or "default".
     """
     function decode(
         tensors;
         max_tokens = 128,
         beam_width = 3,
         stream = false,
-        stream_rate = 1000
+        stream_rate = 1000,
+        show_tokens = false,
+        temperature = 1
     )
         initT = time()
 
@@ -33,11 +37,11 @@ module Decoder
 
         println("Decoding in $(mode) mode.")
         if mode == "sanger"
-            output = sanger_decoder(tensors.forward_markov, max_tokens, stream, stream_rate)
+            output = sanger_decoder(tensors.forward_markov, max_tokens, stream, stream_rate, show_tokens, temperature)
         elseif mode == "beamsearch"
             output = beam_search_decoder(tensors.forward_markov, max_tokens, beam_width)
         else
-            output = default_decoder(tensors.forward_markov, max_tokens, stream, stream_rate)
+            output = default_decoder(tensors.forward_markov, max_tokens, stream, stream_rate, temperature)
         end
         
         println("\nDecoded in $(time() - initT) s")
@@ -47,12 +51,7 @@ module Decoder
         end
     end
 
-    function default_decoder(
-        tensors,
-        max_tokens=128,
-        stream=false,
-        stream_rate=0
-    )
+    function default_decoder(tensors, max_tokens=128, stream=false, stream_rate=0, temperature=1)
         if max_tokens == 0
             return ""
         end
@@ -73,29 +72,7 @@ module Decoder
                 break
             end
 
-            next_options = tensors[current_token]
-            next_tokens = collect(keys(next_options))
-            weights = map(w -> next_options[w], next_tokens)
-
-            # Normalize weights to probabilities
-            total = sum(weights)
-            if total == 0
-                probs = fill(1.0 / max_tokens(next_tokens), max_tokens(next_tokens))
-            else
-                probs = weights ./ total
-            end
-
-            # Generate a random number and select the next token based on cumulative probabilities
-            r = rand()
-            cumulative = 0.0
-            selected_token = ""
-            for (idx, token) in enumerate(next_tokens)
-                cumulative += probs[idx]
-                if cumulative >= r
-                    selected_token = token
-                    break
-                end
-            end
+            selected_token, prob = default_sampler(tensors, current_token, temperature)
 
             # Add space unless it's punctuation
             if selected_token ∉ [".", "!", "?", ",", "’", "'", ":", ";", "—", "/", "s", "t", "m", "d", "ve", "…"] && !init_token
@@ -139,7 +116,7 @@ module Decoder
         end
     end
 
-    function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0)
+    function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0, show_tokens=false, temperature=1)
         if max_tokens == 0
             return ""
         end
@@ -159,29 +136,7 @@ module Decoder
                 break
             end
 
-            next_options = tensors[current_token]
-            next_tokens = collect(keys(next_options))
-            weights = map(w -> next_options[w], next_tokens)
-
-            # Normalize weights to probabilities
-            total = sum(weights)
-            if total == 0
-                probs = fill(1.0 / length(next_tokens), length(next_tokens))
-            else
-                probs = weights ./ total
-            end
-
-            # Generate a random number and select the next token based on cumulative probabilities
-            r = rand()
-            cumulative = 0.0
-            selected_token = ""
-            for (idx, token) in enumerate(next_tokens)
-                cumulative += probs[idx]
-                if cumulative >= r
-                    selected_token = token
-                    break
-                end
-            end
+            selected_token, prob = default_sampler(tensors, current_token, temperature)
 
             current_token = selected_token
             push!(text, current_token)
@@ -193,20 +148,23 @@ module Decoder
                     stream_token = uppercase(stream_token[1]) * lowercase(stream_token[2:end])
                 end
 
-                if current_token ∈ [".", "!", "?"]
-                    capitalise_next = true
-                end
-
-                if stream_token !== nothing
-                    sleep(stream_rate)
-                    print(stream_token)
+                if stream_token!== nothing
+                    if show_tokens
+                        print(stream_token, " \$($prob)")
+                    else
+                        print(stream_token)
+                    end
                     flush(stdout)
-                end
+                end            
             end
             init_token = false
         end
         if !stream
-            return join(text)
+            if show_tokens
+                return join(text, " \$")
+            else
+                return join(text)
+            end
         end
     end
 
@@ -236,18 +194,7 @@ module Decoder
                     continue
                 end
 
-                # Get available next tokens and their weights
-                next_options = tensors[last_token]
-                next_tokens = collect(keys(next_options))
-                weights = map(w -> next_options[w], next_tokens)
-
-                # Normalize weights to probabilities
-                total = sum(weights)
-                if total == 0
-                    probs = fill(1.0 / length(next_tokens), length(next_tokens))
-                else
-                    probs = weights ./ total
-                end
+                next_tokens, probs = normalize_weights(tensors, current_token)
 
                 # Extend each possible next token as a new candidate
                 for (idx, token) in enumerate(next_tokens)

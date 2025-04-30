@@ -1,6 +1,6 @@
 module Utils
 
-    export average_word_length, sanger_split, recapitalise!
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler
 
     function average_word_length(
         text::String,
@@ -38,7 +38,7 @@ module Utils
         context,
         fragment_size
     )
-        n = ncodeunits(context)  # Use ncodeunits to get the number of code units
+        n = ncodeunits(context) 
         result = Vector{String}()
 
         for offset::Int64 in 1:fragment_size
@@ -75,5 +75,41 @@ module Utils
             end
         end
         return text
+    end
+
+    function normalize_weights(tensors, current_token)
+        next_options = tensors[current_token]
+        next_tokens = collect(keys(next_options))
+        weights = map(w -> next_options[w], next_tokens)
+
+        total = sum(weights)
+        if total ≈ 0  # Using ≈ for floating-point comparison
+            probs = fill(1.0 / length(next_tokens), length(next_tokens))
+        else
+            probs = weights./ total
+        end
+        return next_tokens, probs
+    end
+
+    function default_sampler(tensors, current_token, temperature)
+        next_tokens, probs = normalize_weights(tensors, current_token)
+
+        probs = probs.^ temperature
+        probs = probs / sum(probs)
+        
+        r = rand()
+        cumulative = 0.0
+        selected_token = ""
+        selected_prob = 0.0
+
+        for (idx, token) in enumerate(next_tokens)
+            cumulative += probs[idx]
+            if cumulative >= r
+                selected_token = token
+                selected_prob = round(probs[idx], digits=2)
+                break
+            end
+        end
+        return selected_token, selected_prob
     end
 end

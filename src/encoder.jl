@@ -20,6 +20,7 @@ module Encoder
     - `exclude` (optional, default: [" ", "(", ")", "\\"", "*"]): Tokens to exclude from tensordict. Only relevant if `mode` is "default".
     - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
+    - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger".
     """
     function encode(
         context,
@@ -33,14 +34,13 @@ module Encoder
 
         println("Encoding in $mode mode.")
         initT = time()
-        mode = lowercase(mode)
         
         if mode == "sanger"
             markov_dict = sanger_encoder(context, fragment_size, fragment_groups)
             args = "Fragmentation: $fragment_size by $fragment_groups."
         else
             markov_dict = default_encoder(context, end_punctuation, exclude)
-            args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens."
+            args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
         end
 
         println("\nEncoded in $(time() - initT) s")
