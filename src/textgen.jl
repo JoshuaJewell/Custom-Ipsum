@@ -29,6 +29,6 @@ context = read("./data/contexts/localcontext.txt", String)
 
 #tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
         
-print(encoder_decoder(context, "sanger", fragment_size = 4, fragment_groups = 8, temperature=0.8, stream=false, show_tokens=true, max_tokens=256))
+print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 
 # discard 'clean' cuts might help preserve coherence?
