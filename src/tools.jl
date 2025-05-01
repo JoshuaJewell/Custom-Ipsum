@@ -17,7 +17,7 @@ module Tools
         stream = false,
         stream_rate = 1000,
         show_tokens = false,
-        temperature = 0
+        temperature = 1
     )
     return decode(
         encode(context, mode, end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
