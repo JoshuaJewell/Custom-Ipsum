@@ -15,13 +15,15 @@ Random.seed!(123)
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
 
-context = read("./data/contexts/localcontext.txt", String)
+context = read("./data/contexts/macbeth.txt", String)
 
-#tensors = encode(context, "sanger", fragment_groups = 6)
+tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-#open("./data/tensordicts/local123.tensordict", "w") do file
-#    serialize(file, tensors)
-#end
+open("./data/tensordicts/macbeth.tensordict", "w") do file
+    serialize(file, tensors)
+end
+
+print(decode(tensors, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 
 #tensors = open("./data/tensordicts/localtensors.tensordict", "r") do file
 #    deserialize(file)
@@ -29,6 +31,6 @@ context = read("./data/contexts/localcontext.txt", String)
 
 #tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
         
-print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
+#print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 
 # discard 'clean' cuts might help preserve coherence?
