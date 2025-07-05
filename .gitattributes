@@ -1,1 +1,2 @@
 *.tensordict filter=lfs diff=lfs merge=lfs -text
+data/tensordicts/fineweb-top5000.tensordict filter=lfs diff=lfs merge=lfs -text
