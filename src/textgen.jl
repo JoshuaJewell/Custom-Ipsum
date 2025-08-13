@@ -14,20 +14,21 @@ Random.seed!(123)
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
+#tensors = encode_multiple("../../json/","",11842, encoder_mode = "sanger", fragment_size = 5, fragment_groups = 2)
+#35573
+#context = read("./data/contexts/macbeth.txt", String)
 
-context = read("./data/contexts/macbeth.txt", String)
+#tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
+#open("../data/tensordicts/clinton-emails.tensordict", "w") do file
+#    serialize(file, tensors)
+#end
 
-open("./data/tensordicts/macbeth.tensordict", "w") do file
-    serialize(file, tensors)
+tensors = open("../data/tensordicts/clinton-emails.tensordict", "r") do file
+    deserialize(file)
 end
 
 print(decode(tensors, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
-
-#tensors = open("./data/tensordicts/localtensors.tensordict", "r") do file
-#    deserialize(file)
-#end
 
 #tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
         

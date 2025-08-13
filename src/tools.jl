@@ -1,10 +1,11 @@
 module Tools
+    include("types.jl")
     include("encoder.jl")
     include("decoder.jl")
 
-    using .Encoder, .Decoder
+    using .Types, .Encoder, .Decoder
 
-    export encode_multiple, merge_tensors, encoder_decoder
+    export encode_multiple, encoder_decoder
 
     function encoder_decoder(
         context,
@@ -19,15 +20,15 @@ module Tools
         show_tokens = false,
         temperature = 1
     )
-    return decode(
-        encode(context, mode, end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
-        max_tokens=max_tokens,
-        stream=stream,
-        stream_rate=stream_rate,
-        show_tokens=show_tokens,
-        temperature=temperature
+        return decode(
+            encode(context, mode, end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
+            max_tokens=max_tokens,
+            stream=stream,
+            stream_rate=stream_rate,
+            show_tokens=show_tokens,
+            temperature=temperature
     )
-end
+    end
 
     """
         function encode_multiple(path_to_context = "../data/contexts/", context_filename = "context", context_file_no; mode = "equal")
@@ -45,6 +46,8 @@ end
     ## Keyword Arguments
     - `merge_mode` (optional, default: "equal"): The merging mode. Can be "equal", or "weighted". (WIP)
     - `encoder_mode` (optional, default: "default"): The encoder mode. Can be "default", or "sanger".
+    - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
+    - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified.
 
     """
     function encode_multiple(
@@ -52,7 +55,9 @@ end
         context_filename = "context",
         context_file_no = 2;
         merge_mode = "equal",
-        encoder_mode = "default"
+        encoder_mode = "sanger",
+        fragment_size = 1,
+        fragment_groups = 1
     )
         merge_mode = lowercase(merge_mode)
         encoder_mode = lowercase(encoder_mode)
@@ -63,20 +68,41 @@ end
             push!(contexts, context)
         end
 
-        tensors = [encode(context, encoder_mode) for context in contexts]
+        println()
+        tensors = []
+        if encoder_mode == "sanger"
+            for (idx, context) in enumerate(contexts)
+                push!(tensors, sanger_encoder(context, fragment_size, fragment_groups, false))
+                print("\x1b[1A\rFile $(length(tensors)) of $(length(contexts))\n.")
+            end
+            args = "Fragmentation: $fragment_size by $fragment_groups."
+        else
+            for (idx, context) in enumerate(contexts)
+                push!(tensors, default_encoder(context, verbose=false))
+                print("\x1b[1A\rFile $(length(tensors)) of $(length(contexts))\n.")
+            end
+            args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
+        end
 
         merged_tensors = tensors[1]
 
         for i in eachindex(tensors[2:end])
             ratio = 1.0 / i
-            merged_tensors = merge_tensors(merged_tensors, tensors[i + 1], "weighted", ratio = ratio)
+            merged_tensors = merge_tensordicts(merged_tensors, tensors[i + 1], "weighted", ratio = ratio)
         end
 
-        return merged_tensors
+        tensors = CompleteTensors(
+            Header(encoder_mode, args),
+            merged_tensors,
+            Dict{String, Dict{String, Float64}}(), 
+            [""]
+        )
+
+        return tensors
     end
 
     """
-        function merge_tensors(d1::Dict{String, Dict{String, Float64}}, d2::Dict{String, Dict{String, Float64}}; ratio::Float64 = 0.5)
+        function merge_tensordicts(d1::Dict{String, Dict{String, Float64}}, d2::Dict{String, Dict{String, Float64}}; ratio::Float64 = 0.5)
     
     Merges the weights from tensordicts.
 
@@ -88,7 +114,7 @@ end
     - `ratio` (optional, default: 0.5): The ratio by which. Only relevant if `mode` is "ratio".
     - `mode` (optional, default: "weighted"): The merging mode. Can be "ratio", or "weighted". (WIP)
     """
-    function merge_tensors(
+    function merge_tensordicts(
         d1::Dict{String, Dict{String, Float64}},
         d2::Dict{String, Dict{String, Float64}},
         mode = "weighted";
@@ -101,7 +127,7 @@ end
         for (outer_key, inner_dict) in d2
             if haskey(merged_tensors, outer_key)
                 # Merge inner dictionaries with given ratio
-                merged_inner = merge_inner_merge_tensors(merged_tensors[outer_key], inner_dict, ratio)
+                merged_inner = merge_inner_merge_tensordicts(merged_tensors[outer_key], inner_dict, ratio)
                 merged_tensors[outer_key] = merged_inner
             else
                 # Add new outer key from d2
@@ -112,7 +138,7 @@ end
         return merged_tensors
     end
 
-    function merge_inner_merge_tensors(
+    function merge_inner_merge_tensordicts(
         d1::Dict{String, Float64},
         d2::Dict{String, Float64},
         ratio::Float64

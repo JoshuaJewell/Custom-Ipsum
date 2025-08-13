@@ -4,7 +4,7 @@ module Encoder
 
     using .Types, .Utils
 
-    export encode
+    export encode, sanger_encoder, default_encoder
 
     """
         encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
@@ -21,6 +21,7 @@ module Encoder
     - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified - it's a feature, not a bug ;).
+    - `verbose` (optional, default: true): Prints additional information (e.g. "Encoding in sanger mode" or "Encoded in \$s seconds")
     """
     function encode(
         context,
@@ -28,22 +29,23 @@ module Encoder
         end_punctuation = [".", "!", "?"], 
         exclude = [" ", "(", ")", "\"", "*"], 
         fragment_size = 1,
-        fragment_groups = 1
+        fragment_groups = 1,
+        verbose = true
     )
         mode = lowercase(mode)    
 
-        println("Encoding in $mode mode.")
+        verbose && println("Encoding in $mode mode.")
         initT = time()
         
         if mode == "sanger"
-            markov_dict = sanger_encoder(context, fragment_size, fragment_groups)
+            markov_dict = sanger_encoder(context, fragment_size, fragment_groups, verbose)
             args = "Fragmentation: $fragment_size by $fragment_groups."
         else
-            markov_dict = default_encoder(context, end_punctuation, exclude)
+            markov_dict = default_encoder(context, end_punctuation, exclude, verbose)
             args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
         end
 
-        println("\nEncoded in $(time() - initT) s")
+        verbose && println("\nEncoded in $(time() - initT) s")
 
         tensors = CompleteTensors(
             Header(mode, args),
@@ -58,7 +60,8 @@ module Encoder
     function default_encoder(
         context,
         end_punctuation = [".", "!", "?"],
-        exclude=[" ", "(", ")", "\"", "*"],
+        exclude = [" ", "(", ")", "\"", "*"],
+        verbose = true
     )    
         # Extract tokens while preserving original case
         tokens = split(context, r"\b|\W+", keepempty = false)
@@ -95,7 +98,7 @@ module Encoder
             progress = round(100 * i / length(tokens), digits = 2)
             print("\x1b[2K\r$progress% complete. Current token: $current_token...")
         end
-        print("\x1b[2K\r100% complete.")
+        verbose ? print("\x1b[2K\r100% complete.") : print("\x1b[2K\r")
 
         return markov_dict
     end
@@ -103,7 +106,8 @@ module Encoder
     function sanger_encoder(
         context,
         fragment_size = 1,
-        fragment_groups = 1
+        fragment_groups = 1,
+        verbose = true
     )
         if fragment_size > 1
             tokens = sanger_split(context, fragment_size, fragment_groups)
@@ -142,7 +146,7 @@ module Encoder
                 markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
             end            
         end
-        print("\x1b[2K\r100% complete.")
+        verbose ? print("\x1b[2K\r100% complete.") : print("\x1b[2K\r")
 
         return markov_dict
     end
