@@ -17,7 +17,7 @@ module Encoder
     
     ## Keyword Arguments
     - `end_punctuation` (optional, default: [".", "!", "?"]): Markers for ends of sentences. Only relevant if `mode` is "default".
-    - `exclude` (optional, default: [" ", "(", ")", "\\"", "*"]): Tokens to exclude from tensordict. Only relevant if `mode` is "default".
+    - `exclude` (optional, default: [""]: Phrases to exclude from tensordict. Value of ["\n", "(", ")", "\\"", "*"] recommended if `mode` is "default".
     - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified - it's a feature, not a bug ;).
@@ -27,7 +27,7 @@ module Encoder
         context,
         mode = "default";
         end_punctuation = [".", "!", "?"], 
-        exclude = [" ", "(", ")", "\"", "*"], 
+        exclude = [""], 
         fragment_size = 1,
         fragment_groups = 1,
         verbose = true
@@ -38,7 +38,7 @@ module Encoder
         initT = time()
         
         if mode == "sanger"
-            markov_dict = sanger_encoder(context, fragment_size, fragment_groups, verbose)
+            markov_dict = sanger_encoder(context, fragment_size, fragment_groups, exclude, verbose)
             args = "Fragmentation: $fragment_size by $fragment_groups."
         else
             markov_dict = default_encoder(context, end_punctuation, exclude, verbose)
@@ -60,7 +60,7 @@ module Encoder
     function default_encoder(
         context,
         end_punctuation = [".", "!", "?"],
-        exclude = [" ", "(", ")", "\"", "*"],
+        exclude = ["\n", "(", ")", "\"", "*"],
         verbose = true
     )    
         # Extract tokens while preserving original case
@@ -109,8 +109,11 @@ module Encoder
         context,
         fragment_size = 1,
         fragment_groups = 1,
+        exclude = [""],
         verbose = true
     )
+        context = replace(context, Regex(join(exclude, "|")) => "")
+
         if fragment_size > 1
             tokens = sanger_split(context, fragment_size, fragment_groups)
         else

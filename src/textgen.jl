@@ -14,7 +14,7 @@ Random.seed!(123)
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
-tensors = encode_multiple("../json/","",100, encoder_mode = "sanger", fragment_size = 5, fragment_groups = 1)
+tensors = encode_multiple("../json/","",100, encoder_mode = "sanger", fragment_size = 5, fragment_groups = 1, exclude = ["\n"])
 #35573
 #context = read("./data/contexts/macbeth.txt", String)
 

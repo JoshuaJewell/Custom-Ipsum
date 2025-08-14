@@ -56,6 +56,7 @@ module Tools
         context_file_no = 2;
         merge_mult = 1,
         encoder_mode = "sanger",
+        exclude = [""],
         fragment_size = 1,
         fragment_groups = 1
     )
@@ -75,11 +76,11 @@ module Tools
         for (idx, context) in enumerate(contexts)
             print("\x1b[1A\rProcessing file $idx of $contextcount\n...")
             if encoder_mode == "sanger"
-                tensor = sanger_encoder(context, fragment_size, fragment_groups, false)
-                args = "Fragmentation: $fragment_size by $fragment_groups."
+                tensor = sanger_encoder(context, fragment_size, fragment_groups, exclude, false)
+                args = "Fragmentation: $fragment_size by $fragment_groups. $exclude excluded."
             else
                 tensor = default_encoder(context, verbose=false)
-                args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
+                args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens. $exclude excluded."
             end
 
             if merged_tensors === nothing
