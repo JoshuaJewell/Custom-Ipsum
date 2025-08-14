@@ -69,27 +69,25 @@ module Tools
         end
 
         println()
-        tensors = []
-        if encoder_mode == "sanger"
-            for (idx, context) in enumerate(contexts)
-                print("\x1b[1A\rProcessing file $(length(tensors)) of $(length(contexts))\n...")
-                push!(tensors, sanger_encoder(context, fragment_size, fragment_groups, false))
+        merged_tensors = nothing
+        for (idx, context) in enumerate(contexts)
+            print("\x1b[1A\rProcessing file $idx of $(length(contexts))\n...")
+            if encoder_mode == "sanger"
+                tensor = sanger_encoder(context, fragment_size, fragment_groups, false)
+                args = "Fragmentation: $fragment_size by $fragment_groups."
+            else
+                tensor = default_encoder(context, verbose=false)
+                args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
             end
-            args = "Fragmentation: $fragment_size by $fragment_groups."
-        else
-            for (idx, context) in enumerate(contexts)
-                print("\x1b[1A\rProcessing file $(length(tensors)) of $(length(contexts))\n...")
-                push!(tensors, default_encoder(context, verbose=false))
-            end
-            args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
-        end
 
-        merged_tensors = tensors[1]
-        for i in eachindex(tensors[2:end])
-            ratio = 1.0 / i
-            merged_tensors = merge_tensordicts(merged_tensors, tensors[i + 1], "weighted", ratio = ratio)
-            progress = round(100 * i / length(tensors), digits = 2)
-            print("\x1b[2K\rMerging $progress% complete.")
+            if merged_tensors === nothing
+                merged_tensors = tensor
+            else
+                ratio = 1.0 / idx
+                merged_tensors = merge_tensordicts(merged_tensors, tensor, "weighted", ratio = ratio)
+                progress = round(100 * idx / length(contexts), digits = 2)
+                print("\x1b[2K\rMerging $progress% complete.")
+            end
         end
         println("\x1b[2K\rMerged tensors!")
 
