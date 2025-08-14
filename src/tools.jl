@@ -70,8 +70,10 @@ module Tools
 
         println()
         merged_tensors = nothing
+        contextcount = length(contexts)
+
         for (idx, context) in enumerate(contexts)
-            print("\x1b[1A\rProcessing file $idx of $(length(contexts))\n...")
+            print("\x1b[1A\rProcessing file $idx of $contextcount\n...")
             if encoder_mode == "sanger"
                 tensor = sanger_encoder(context, fragment_size, fragment_groups, false)
                 args = "Fragmentation: $fragment_size by $fragment_groups."
@@ -85,11 +87,8 @@ module Tools
             else
                 ratio = 1.0 / idx
                 merged_tensors = merge_tensordicts(merged_tensors, tensor, "weighted", ratio = ratio)
-                progress = round(100 * idx / length(contexts), digits = 2)
-                print("\x1b[2K\rMerging $progress% complete.")
             end
         end
-        println("\x1b[2K\rMerged tensors!")
 
         tensors = CompleteTensors(
             Header(encoder_mode, args),
@@ -147,8 +146,14 @@ module Tools
 
         # Get all unique keys from both dictionaries
         all_keys = union(keys(d1), keys(d2))
+        total_keys = length(all_keys)
+        processed_keys = 0
 
         for key in all_keys
+            processed_keys += 1
+            progress = round(100 * processed_keys / total_keys, digits = 2)
+            print("\x1b[2K\rMerging token into existing dictionary: $(replace(key, "\n" => ""))...")
+
             val1 = get(d1, key, 0.0)
             val2 = get(d2, key, 0.0)
 

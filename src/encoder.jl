@@ -75,7 +75,9 @@ module Encoder
         markov_dict[init_token] = Dict{String, Float64}()
 
         # Iterate through the tokens to build the Markov chain
-        for i in 1:length(tokens)-1
+        tokencount = length(tokens)
+
+        for i in 1:tokencount-1
             current_token = tokens[i]
             next_token = tokens[i+1]
             if !haskey(markov_dict, current_token)
@@ -95,8 +97,8 @@ module Encoder
                 markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
             end
 
-            progress = round(100 * i / length(tokens), digits = 2)
-            print("\x1b[2K\r$progress% complete. Current token: $current_token...")
+            progress = round(100 * i / tokencount, digits = 2)
+            print("\x1b[2K\rEncoding $progress% complete. Current token: $current_token...")
         end
         verbose ? print("\x1b[2K\r100% complete.") : print("\x1b[2K\r")
 
@@ -123,7 +125,9 @@ module Encoder
         markov_dict[init_token] = Dict{String, Float64}()
 
         # Iterate through the tokens to build the Markov chain
-        for i in 1:length(tokens)-1
+        tokencount = length(tokens)
+
+        for i in 1:tokencount-1
             current_token = tokens[i]
             next_token = tokens[i+1]
             if !haskey(markov_dict, current_token)
@@ -134,8 +138,8 @@ module Encoder
             end
             markov_dict[current_token][next_token] += 1.0
 
-            progress = round(100 * i / length(tokens), digits = 2)
-            print("\x1b[2K\r$progress% complete. Current token: $(filter(c -> c != '\n', current_token))...")
+            progress = round(100 * i / tokencount, digits = 2)
+            print("\x1b[2K\rEncoding $progress% complete. Current token: $(filter(c -> c != '\n', current_token))...")
 
             if i == 1 || endswith(current_token, "\n")
                 markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
