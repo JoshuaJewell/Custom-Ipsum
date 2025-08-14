@@ -100,7 +100,7 @@ module Encoder
             progress = round(100 * i / tokencount, digits = 2)
             print("\x1b[2K\rEncoding $progress% complete. Current token: $current_token...")
         end
-        verbose ? print("\x1b[2K\r100% complete.") : print("\x1b[2K\r")
+        verbose ? print("\x1b[2K\r100% complete.") : nothing
 
         return markov_dict
     end
@@ -150,7 +150,7 @@ module Encoder
                 markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
             end            
         end
-        verbose ? print("\x1b[2K\r100% complete.") : print("\x1b[2K\r")
+        verbose ? print("\x1b[2K\r100% complete.") : nothing
 
         return markov_dict
     end

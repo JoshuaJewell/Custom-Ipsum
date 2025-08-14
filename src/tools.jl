@@ -44,7 +44,7 @@ module Tools
     - `context_file_no` (default: 2): The number of context files, indexed from 1.
 
     ## Keyword Arguments
-    - `merge_mode` (optional, default: "equal"): The merging mode. Can be "equal", or "weighted". (WIP)
+    - `merge_mult` (optional, default: 1): How much weight to give added tensordict. (WIP)
     - `encoder_mode` (optional, default: "default"): The encoder mode. Can be "default", or "sanger".
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified.
@@ -54,12 +54,11 @@ module Tools
         path_to_context = "../data/contexts/",
         context_filename = "context",
         context_file_no = 2;
-        merge_mode = "equal",
+        merge_mult = 1,
         encoder_mode = "sanger",
         fragment_size = 1,
         fragment_groups = 1
     )
-        merge_mode = lowercase(merge_mode)
         encoder_mode = lowercase(encoder_mode)
 
         contexts = []
@@ -71,6 +70,7 @@ module Tools
         println()
         merged_tensors = nothing
         contextcount = length(contexts)
+        args = ""
 
         for (idx, context) in enumerate(contexts)
             print("\x1b[1A\rProcessing file $idx of $contextcount\n...")
@@ -85,8 +85,7 @@ module Tools
             if merged_tensors === nothing
                 merged_tensors = tensor
             else
-                ratio = 1.0 / idx
-                merged_tensors = merge_tensordicts(merged_tensors, tensor, "weighted", ratio = ratio)
+                merged_tensors = merge_tensordicts(merged_tensors, tensor)
             end
         end
 
@@ -108,63 +107,36 @@ module Tools
     ## Arguments
     - `d1`: Tensordict the first.
     - `d2`: Tensordict the second.
-
-    ## Keyword Arguments
-    - `ratio` (optional, default: 0.5): The ratio by which. Only relevant if `mode` is "ratio".
-    - `mode` (optional, default: "weighted"): The merging mode. Can be "ratio", or "weighted". (WIP)
     """
     function merge_tensordicts(
         d1::Dict{String, Dict{String, Float64}},
-        d2::Dict{String, Dict{String, Float64}},
-        mode = "weighted";
-        ratio::Float64 = 0.5
+        d2::Dict{String, Dict{String, Float64}};
+        merge_mult = 1
     )
-        mode = lowercase(mode)
-
-        merged_tensors = deepcopy(d1)
-
         for (outer_key, inner_dict) in d2
-            if haskey(merged_tensors, outer_key)
-                # Merge inner dictionaries with given ratio
-                merged_inner = merge_inner_merge_tensordicts(merged_tensors[outer_key], inner_dict, ratio)
-                merged_tensors[outer_key] = merged_inner
+            if haskey(d1, outer_key)
+                merge!(d1[outer_key], inner_dict)
             else
-                # Add new outer key from d2
-                merged_tensors[outer_key] = deepcopy(inner_dict)
+                d1[outer_key] = inner_dict
             end
         end
 
-        return merged_tensors
+        return d1
     end
 
     function merge_inner_merge_tensordicts(
         d1::Dict{String, Float64},
-        d2::Dict{String, Float64},
-        ratio::Float64
+        d2::Dict{String, Float64};
+        merge_mult = 1
     )
-        merged_inner = Dict{String, Float64}()
-
-        # Get all unique keys from both dictionaries
-        all_keys = union(keys(d1), keys(d2))
-        total_keys = length(all_keys)
-        processed_keys = 0
-
-        for key in all_keys
-            processed_keys += 1
-            progress = round(100 * processed_keys / total_keys, digits = 2)
-            print("\x1b[2K\rMerging token into existing dictionary: $(replace(key, "\n" => ""))...")
-
-            val1 = get(d1, key, 0.0)
-            val2 = get(d2, key, 0.0)
-
-            # Compute the weighted sum
-            new_val = val1 * (1 - ratio) + val2 * ratio
-
-            if new_val != 0.0
-                merged_inner[key] = new_val
+        for (key, value) in d2
+            if haskey(d1, key)
+                d1[key] += value
+            else
+                d1[key] = value
             end
         end
 
-        return merged_inner
+        return d1
     end
 end
