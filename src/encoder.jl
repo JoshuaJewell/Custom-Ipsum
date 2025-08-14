@@ -112,7 +112,8 @@ module Encoder
         exclude = [""],
         verbose = true
     )
-        context = replace(context, Regex(join(exclude, "|")) => "")
+        context = replace(context, Regex(join(exclude, "|")) => " ")
+        context = replace(context, "  " => " ")
 
         if fragment_size > 1
             tokens = sanger_split(context, fragment_size, fragment_groups)

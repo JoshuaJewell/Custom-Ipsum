@@ -14,15 +14,15 @@ Random.seed!(123)
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
-tensors = encode_multiple("../json/","",100, encoder_mode = "sanger", fragment_size = 5, fragment_groups = 1, exclude = ["\n"])
+tensors = encode_multiple("../json/","",35573, encoder_mode = "sanger", fragment_size = 5, fragment_groups = 1, exclude = ["\n"])
 #35573
 #context = read("./data/contexts/macbeth.txt", String)
 
 #tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-open("./data/tensordicts/clinton-emails.tensordict", "w") do file
-    serialize(file, tensors)
-end
+#open("./data/tensordicts/clinton-emails.tensordict", "w") do file
+#    serialize(file, tensors)
+#end
 
 #tensors = open("../data/tensordicts/clinton-emails.tensordict", "r") do file
 #    deserialize(file)
@@ -35,3 +35,4 @@ print(decode(tensors, temperature=0.8, stream=false, show_tokens=false, max_toke
 #print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 
 # discard 'clean' cuts might help preserve coherence?
+# use default_encoder to check output of sanger_encoder?
