@@ -5,7 +5,7 @@ module Tools
 
     using .Types, .Encoder, .Decoder
 
-    export encode_multiple, encoder_decoder
+    export encode_multiple, encoder_decoder, encode_incremental
 
     function encoder_decoder(
         context,
@@ -72,24 +72,26 @@ module Tools
         tensors = []
         if encoder_mode == "sanger"
             for (idx, context) in enumerate(contexts)
+                print("\x1b[1A\rProcessing file $(length(tensors)) of $(length(contexts))\n...")
                 push!(tensors, sanger_encoder(context, fragment_size, fragment_groups, false))
-                print("\x1b[1A\rFile $(length(tensors)) of $(length(contexts))\n.")
             end
             args = "Fragmentation: $fragment_size by $fragment_groups."
         else
             for (idx, context) in enumerate(contexts)
+                print("\x1b[1A\rProcessing file $(length(tensors)) of $(length(contexts))\n...")
                 push!(tensors, default_encoder(context, verbose=false))
-                print("\x1b[1A\rFile $(length(tensors)) of $(length(contexts))\n.")
             end
             args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
         end
 
         merged_tensors = tensors[1]
-
         for i in eachindex(tensors[2:end])
             ratio = 1.0 / i
             merged_tensors = merge_tensordicts(merged_tensors, tensors[i + 1], "weighted", ratio = ratio)
+            progress = round(100 * i / length(tensors), digits = 2)
+            print("\x1b[2K\rMerging $progress% complete.")
         end
+        println("\x1b[2K\rMerged tensors!")
 
         tensors = CompleteTensors(
             Header(encoder_mode, args),

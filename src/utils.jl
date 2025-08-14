@@ -44,57 +44,77 @@ module Utils
         return result
     end
     
-    function sanger_split_base(context, fragment_size)
-        n = ncodeunits(context)
-        result = Vector{String}()
+    #function sanger_split_base(context, fragment_size)
+    #    n = ncodeunits(context)
+    #    result = Vector{String}()
     
+    #    for offset in 1:fragment_size
+    #        current_pos = offset
+    #        while current_pos <= n
+    #            end_pos = current_pos
+    #            for _ in 1:(fragment_size - 1)
+    #                if end_pos > n
+    #                    break
+    #                end
+    #                end_pos = nextind(context, end_pos)
+    #            end
+    
+    #            token = context[current_pos:prevind(context, end_pos)]
+    #            push!(result, token)
+    #            current_pos = nextind(context, end_pos - 1)
+    #        end
+    #    end
+    
+    #    return result
+    #end
+
+    function sanger_split_base(context, fragment_size)
+        result = Vector{String}()
+        chars = collect(context)
+
         for offset in 1:fragment_size
             current_pos = offset
-            while current_pos <= n
+            while current_pos <= length(chars)
                 end_pos = current_pos
                 for _ in 1:(fragment_size - 1)
-                    if end_pos > n
+                    if end_pos >= length(chars)
                         break
                     end
-                    end_pos = nextind(context, end_pos)
+                    end_pos += 1
                 end
-    
-                token = context[current_pos:prevind(context, end_pos)]
+
+                if end_pos > length(chars)
+                    break
+                end
+
+                token = join(chars[current_pos:end_pos])
                 push!(result, token)
-                current_pos = nextind(context, end_pos - 1)
+                current_pos += fragment_size
             end
         end
-    
+
         return result
     end
     
     function sanger_split_alt(context, size1, size2)
-        n = ncodeunits(context)
-        result = Vector{String}()
-    
+        result = String[]
+        chars = collect(context)
+        n = length(chars)
+        sizes = [size1, size2]
+
         for offset in 1:min(size1, size2)
-            current_pos = offset
+            current_pos = offset - 1
             current_size_idx = 1
-            sizes = [size1, size2]
-    
-            while current_pos <= n
-                current_size = sizes[current_size_idx]
-                end_pos = current_pos
-                for _ in 1:(current_size - 1)
-                    if end_pos > n
-                        break
-                    end
-                    end_pos = nextind(context, end_pos)
-                end
-    
-                token = context[current_pos:prevind(context, end_pos)]
-                push!(result, token)
-                current_pos = nextind(context, end_pos - 1)
-    
-                current_size_idx = 3 - current_size_idx  # Toggle between 1 and 2
+
+            while current_pos < n
+                chunk_size = sizes[current_size_idx]
+                end_pos = min(current_pos + chunk_size - 1, n - 1)
+                push!(result, join(chars[(current_pos + 1):(end_pos + 1)]))
+                current_pos += chunk_size
+                current_size_idx = 3 - current_size_idx
             end
         end
-    
+
         return result
     end
 
