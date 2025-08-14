@@ -43,30 +43,6 @@ module Utils
     
         return result
     end
-    
-    #function sanger_split_base(context, fragment_size)
-    #    n = ncodeunits(context)
-    #    result = Vector{String}()
-    
-    #    for offset in 1:fragment_size
-    #        current_pos = offset
-    #        while current_pos <= n
-    #            end_pos = current_pos
-    #            for _ in 1:(fragment_size - 1)
-    #                if end_pos > n
-    #                    break
-    #                end
-    #                end_pos = nextind(context, end_pos)
-    #            end
-    
-    #            token = context[current_pos:prevind(context, end_pos)]
-    #            push!(result, token)
-    #            current_pos = nextind(context, end_pos - 1)
-    #        end
-    #    end
-    
-    #    return result
-    #end
 
     function sanger_split_base(context, fragment_size)
         result = Vector{String}()
