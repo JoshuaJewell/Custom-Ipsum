@@ -3,7 +3,7 @@ module Tools
     include("encoder.jl")
     include("decoder.jl")
 
-    using .Types, .Encoder, .Decoder
+    using .Types, .Encoder, .Decoder, Distributed
 
     export encode_multiple, encoder_decoder, encode_incremental
 
@@ -74,6 +74,33 @@ module Tools
 
         num_threads = Threads.nthreads()
         results = Vector{Any}(undef, num_threads)
+        result_channel = Channel{Any}(num_threads)
+
+        final_task = @async begin
+            final_merged_tensors = nothing
+            finished_count = 0
+            while finished_count < num_threads
+                result = take!(result_channel)
+                print("\x1b[2K\rFinalising: $finished_count of $(length(results))")
+                if result !== nothing
+                    if final_merged_tensors === nothing
+                        final_merged_tensors = result
+                    else
+                        final_merged_tensors = merge_tensordicts(final_merged_tensors, result)
+                    end
+                end
+                finished_count += 1
+            end
+
+            tensors = CompleteTensors(
+                Header(encoder_mode, args),
+                final_merged_tensors,
+                Dict{String, Dict{String, Float64}}(), 
+                [""]
+            )
+
+            return tensors
+        end
 
         Threads.@threads for tid in 1:num_threads
             start = ((tid - 1) * div(contextcount, num_threads)) + 1
@@ -106,29 +133,10 @@ module Tools
                 end
             end
 
-            results[tid] = local_tensor
+            put!(result_channel, local_tensor)
         end
 
-        final_merged_tensors = nothing
-        for (i, tensor) in enumerate(results)
-            print("\x1b[2K\rFinalising: $i of $(length(results))")
-            if tensor !== nothing
-                if final_merged_tensors === nothing
-                    final_merged_tensors = tensor
-                else
-                    final_merged_tensors = merge_tensordicts(final_merged_tensors, tensor)
-                end
-            end
-        end
-
-        tensors = CompleteTensors(
-            Header(encoder_mode, args),
-            final_merged_tensors,
-            Dict{String, Dict{String, Float64}}(), 
-            [""]
-        )
-
-        return tensors
+        return fetch(final_task)
     end
 
     """
