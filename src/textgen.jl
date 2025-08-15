@@ -30,7 +30,7 @@ end
 #    deserialize(file)
 #end
 
-#tensors = merge_completetensors(tensors1, tensors2)
+#tensors = merge_ctensors(tensors1, tensors2)
 
 print(decode(tensors, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 

@@ -47,7 +47,7 @@ module Encoder
 
         verbose && println("\nEncoded in $(time() - initT) s")
 
-        tensors = pack_completetensors(mode, args, markov_dict)
+        tensors = pack_ctensors(mode, args, markov_dict)
 
         return tensors
     end

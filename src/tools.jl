@@ -6,7 +6,7 @@ module Tools
 
     using .Types, .Encoder, .Decoder, Distributed, .Utils
 
-    export encode_multiple, encoder_decoder, merge_completetensors
+    export encode_multiple, encoder_decoder, merge_ctensors
 
     function encoder_decoder(
         context,
@@ -93,7 +93,7 @@ module Tools
                 finished_count += 1
             end
 
-            tensors = pack_completetensors(encoder_mode, args, final_merged_tensors)
+            tensors = pack_ctensors(encoder_mode, args, final_merged_tensors)
 
             return tensors
         end
@@ -136,7 +136,7 @@ module Tools
     end
 
     """
-        function merge_completetensors(tensorsfile1, tensorsfile2; merge_mult = 1)
+        function merge_ctensors(tensorsfile1, tensorsfile2; merge_mult = 1)
     
     Merges the weights from tensordicts.
 
@@ -145,7 +145,7 @@ module Tools
     - `tensorsfile2`: Tensordict the second.
     - `merge_mult`: Tensordict the second.
     """
-    function merge_completetensors(
+    function merge_ctensors(
         tensorsfile1,
         tensorsfile2;
         merge_mult = 1
@@ -156,8 +156,8 @@ module Tools
             print("Headers match, proceeding to merge.")
         end
 
-        tensors1 = unpack_completetensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
-        tensors2 = unpack_completetensors(tensorsfile2) #          1            2            3               4             5
+        tensors1 = unpack_ctensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
+        tensors2 = unpack_ctensors(tensorsfile2) #          1            2            3               4             5
 
         # Merge markov chains
         merged_forward_markov = merge_tensordicts(
@@ -175,7 +175,7 @@ module Tools
         merged_token_index = vcat(tensors1[5], tensors2[5])
 
         # Create new CompleteTensors instance
-        merged_tensor = pack_completetensors(tensors1[1], tensors1[2], merged_forward_markov, merged_reverse_markov, merged_token_index)
+        merged_tensor = pack_ctensors(tensors1[1], tensors1[2], merged_forward_markov, merged_reverse_markov, merged_token_index)
 
         return merged_tensor
     end

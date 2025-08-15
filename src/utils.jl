@@ -3,7 +3,7 @@ module Utils
 
     using .Types
 
-    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_completetensors, unpack_completetensors
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors
 
     function average_word_length(
         text::String,
@@ -177,23 +177,23 @@ module Utils
         return d1
     end
 
-    function pack_completetensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{String, Dict{String, Float64}}(), reverse_markov = Dict{String, Dict{String, Float64}}(), token_index = [""])
-        completetensors = CompleteTensors(
+    function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{String, Dict{String, Float64}}(), reverse_markov = Dict{String, Dict{String, Float64}}(), token_index = [""])
+        ctensors = CompleteTensors(
             Header(encoding_method, metadata),
             forward_markov,
             reverse_markov, 
             token_index
         )
 
-        return completetensors
+        return ctensors
     end
 
-    function unpack_completetensors(completetensors)
-        encoding_method = completetensors.header.encoding_method
-        metadata = completetensors.header.metadata
-        forward_markov = completetensors.forward_markov
-        reverse_markov = completetensors.reverse_markov
-        token_index = completetensors.token_index
+    function unpack_ctensors(ctensors)
+        encoding_method = ctensors.header.encoding_method
+        metadata = ctensors.header.metadata
+        forward_markov = ctensors.forward_markov
+        reverse_markov = ctensors.reverse_markov
+        token_index = ctensors.token_index
 
         return encoding_method, metadata, forward_markov, reverse_markov, token_index
     end
