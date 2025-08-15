@@ -69,30 +69,61 @@ module Tools
         end
 
         println()
-        merged_tensors = nothing
         contextcount = length(contexts)
         args = ""
 
-        for (idx, context) in enumerate(contexts)
-            print("\x1b[1A\rProcessing file $idx of $contextcount\n...")
-            if encoder_mode == "sanger"
-                tensor = sanger_encoder(context, fragment_size, fragment_groups, exclude, false)
-                args = "Fragmentation: $fragment_size by $fragment_groups. $exclude excluded."
-            else
-                tensor = default_encoder(context, verbose=false)
-                args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens. $exclude excluded."
+        num_threads = Threads.nthreads()
+        results = Vector{Any}(undef, num_threads)
+
+        Threads.@threads for tid in 1:num_threads
+            start = ((tid - 1) * div(contextcount, num_threads)) + 1
+            stop = min(tid * div(contextcount, num_threads), contextcount)
+            if tid == num_threads
+                stop = contextcount
             end
 
-            if merged_tensors === nothing
-                merged_tensors = tensor
-            else
-                merged_tensors = merge_tensordicts(merged_tensors, tensor)
+            print("\x1b[5A\rFour threads sample:\x1b[5B")
+            local_tensor = nothing
+            for i in start:stop
+                context = contexts[i]
+
+                (Threads.threadid() == 1) ? print("\x1b[4A\rThread 1 encoding file $(i-start+1) of $(stop-start+1)...\x1b[4B") : nothing
+                (Threads.threadid() == 2) ? print("\x1b[3A\rThread 2 encoding file $(i-start+1) of $(stop-start+1)...\x1b[3B") : nothing
+                (Threads.threadid() == 3) ? print("\x1b[2A\rThread 3 encoding file $(i-start+1) of $(stop-start+1)...\x1b[2B") : nothing
+                (Threads.threadid() == 4) ? print("\x1b[1A\rThread 4 encoding file $(i-start+1) of $(stop-start+1)...\x1b[1B") : nothing
+                if encoder_mode == "sanger"
+                    tensor = sanger_encoder(context, fragment_size, fragment_groups, exclude, false)
+                    args = "Fragmentation: $fragment_size by $fragment_groups. $exclude excluded."
+                else
+                    tensor = default_encoder(context, verbose=false)
+                    args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens. $exclude excluded."
+                end
+
+                if local_tensor === nothing
+                    local_tensor = tensor
+                else
+                    local_tensor = merge_tensordicts(local_tensor, tensor)
+                end
+            end
+
+            results[tid] = local_tensor
+        end
+
+        final_merged_tensors = nothing
+        for (i, tensor) in enumerate(results)
+            print("\x1b[2K\rFinalising: $i of $(length(results))")
+            if tensor !== nothing
+                if final_merged_tensors === nothing
+                    final_merged_tensors = tensor
+                else
+                    final_merged_tensors = merge_tensordicts(final_merged_tensors, tensor)
+                end
             end
         end
 
         tensors = CompleteTensors(
             Header(encoder_mode, args),
-            merged_tensors,
+            final_merged_tensors,
             Dict{String, Dict{String, Float64}}(), 
             [""]
         )
