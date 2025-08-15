@@ -2,10 +2,11 @@ module Tools
     include("types.jl")
     include("encoder.jl")
     include("decoder.jl")
+    include("utils.jl")
 
-    using .Types, .Encoder, .Decoder, Distributed
+    using .Types, .Encoder, .Decoder, Distributed, .Utils
 
-    export encode_multiple, encoder_decoder, encode_incremental
+    export encode_multiple, encoder_decoder, merge_completetensors
 
     function encoder_decoder(
         context,
@@ -92,12 +93,7 @@ module Tools
                 finished_count += 1
             end
 
-            tensors = CompleteTensors(
-                Header(encoder_mode, args),
-                final_merged_tensors,
-                Dict{String, Dict{String, Float64}}(), 
-                [""]
-            )
+            tensors = pack_completetensors(encoder_mode, args, final_merged_tensors)
 
             return tensors
         end
@@ -140,43 +136,47 @@ module Tools
     end
 
     """
-        function merge_tensordicts(d1::Dict{String, Dict{String, Float64}}, d2::Dict{String, Dict{String, Float64}}; ratio::Float64 = 0.5)
+        function merge_completetensors(tensorsfile1, tensorsfile2; merge_mult = 1)
     
     Merges the weights from tensordicts.
 
     ## Arguments
-    - `d1`: Tensordict the first.
-    - `d2`: Tensordict the second.
+    - `tensorsfile1`: Tensordict the first.
+    - `tensorsfile2`: Tensordict the second.
+    - `merge_mult`: Tensordict the second.
     """
-    function merge_tensordicts(
-        d1::Dict{String, Dict{String, Float64}},
-        d2::Dict{String, Dict{String, Float64}};
+    function merge_completetensors(
+        tensorsfile1,
+        tensorsfile2;
         merge_mult = 1
     )
-        for (outer_key, inner_dict) in d2
-            if haskey(d1, outer_key)
-                merge!(d1[outer_key], inner_dict)
-            else
-                d1[outer_key] = inner_dict
-            end
+        if (tensorsfile1.header != tensorsfile2.header) || (tensorsfile1.header.encoding_method == "unkown")
+            error("Headers do not match")
+        else
+            print("Headers match, proceeding to merge.")
         end
 
-        return d1
-    end
+        tensors1 = unpack_completetensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
+        tensors2 = unpack_completetensors(tensorsfile2) #          1            2            3               4             5
 
-    function merge_inner_merge_tensordicts(
-        d1::Dict{String, Float64},
-        d2::Dict{String, Float64};
-        merge_mult = 1
-    )
-        for (key, value) in d2
-            if haskey(d1, key)
-                d1[key] += value
-            else
-                d1[key] = value
-            end
-        end
+        # Merge markov chains
+        merged_forward_markov = merge_tensordicts(
+            tensors1[3],
+            tensors2[3];
+            merge_mult = merge_mult
+        )
+        merged_reverse_markov = merge_tensordicts(
+            tensors1[4],
+            tensors2[4];
+            merge_mult = merge_mult
+        )
 
-        return d1
+        # Concatenate token_index (not using it yet anyway sooo...)
+        merged_token_index = vcat(tensors1[5], tensors2[5])
+
+        # Create new CompleteTensors instance
+        merged_tensor = pack_completetensors(tensors1[1], tensors1[2], merged_forward_markov, merged_reverse_markov, merged_token_index)
+
+        return merged_tensor
     end
 end

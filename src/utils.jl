@@ -1,6 +1,9 @@
 module Utils
+    include("types.jl")
 
-    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler
+    using .Types
+
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_completetensors, unpack_completetensors
 
     function average_word_length(
         text::String,
@@ -140,5 +143,58 @@ module Utils
             end
         end
         return selected_token, selected_prob
+    end
+
+    function merge_tensordicts(
+        d1::Dict{String, Dict{String, Float64}},
+        d2::Dict{String, Dict{String, Float64}};
+        merge_mult = 1
+    )
+        for (outer_key, inner_dict) in d2
+            if haskey(d1, outer_key)
+                merge!(d1[outer_key], inner_dict)
+            else
+                d1[outer_key] = inner_dict
+            end
+        end
+
+        return d1
+    end
+
+    function merge_inner_merge_tensordicts(
+        d1::Dict{String, Float64},
+        d2::Dict{String, Float64};
+        merge_mult = 1
+    )
+        for (key, value) in d2
+            if haskey(d1, key)
+                d1[key] += value
+            else
+                d1[key] = value
+            end
+        end
+
+        return d1
+    end
+
+    function pack_completetensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{String, Dict{String, Float64}}(), reverse_markov = Dict{String, Dict{String, Float64}}(), token_index = [""])
+        completetensors = CompleteTensors(
+            Header(encoding_method, metadata),
+            forward_markov,
+            reverse_markov, 
+            token_index
+        )
+
+        return completetensors
+    end
+
+    function unpack_completetensors(completetensors)
+        encoding_method = completetensors.header.encoding_method
+        metadata = completetensors.header.metadata
+        forward_markov = completetensors.forward_markov
+        reverse_markov = completetensors.reverse_markov
+        token_index = completetensors.token_index
+
+        return encoding_method, metadata, forward_markov, reverse_markov, token_index
     end
 end
