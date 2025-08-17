@@ -1,3 +1,6 @@
-*.tensordict filter=lfs diff=lfs merge=lfs -text
-.tensordict filter=lfs diff=lfs merge=lfs -text
-models/** filter=lfs diff=lfs merge=lfs -text
+*.atensors filter=lfs diff=lfs merge=lfs -text
+.atensors filter=lfs diff=lfs merge=lfs -text
+*.btensors filter=lfs diff=lfs merge=lfs -text
+.btensors filter=lfs diff=lfs merge=lfs -text
+*.ctensors filter=lfs diff=lfs merge=lfs -text
+.ctensors filter=lfs diff=lfs merge=lfs -text
