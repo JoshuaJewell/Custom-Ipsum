@@ -1,6 +1,6 @@
 module Types
 
-    export Header, Metadata, Kwargs, CompleteTensors
+    export Header, CompleteTensors
 
     ## CompleteTensors V1
     #struct Header
@@ -8,12 +8,12 @@ module Types
     #    metadata::String
     #end
 
-    struct Metadata
+    #struct Metadata
     #    tensor_type::Int
-        tensor_version::Int
-        kwargs::Kwargs
-        comments::String
-    end
+    #    tensor_version::Int
+    #    kwargs::Kwargs
+    #    comments::String
+    #end
 
     #struct Kwargs
     #    end_punctuation::Vector{String}
@@ -29,10 +29,10 @@ module Types
     #    token_index::Vector{String}
     #end
 
-    struct BasicTensors
-        header::Header
-        forward_markov::Dict{String, Dict{String, Float64}}
-    end
+    #struct BasicTensors
+    #    header::Header
+    #    forward_markov::Dict{String, Dict{String, Float64}}
+    #end
 
     ## CompleteTensors V0
     struct Header

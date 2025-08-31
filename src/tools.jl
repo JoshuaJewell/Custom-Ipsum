@@ -45,7 +45,6 @@ module Tools
     - `context_file_no` (default: 2): The number of context files, indexed from 1.
 
     ## Keyword Arguments
-    - `merge_mult` (optional, default: 1): How much weight to give added tensordict. (WIP)
     - `encoder_mode` (optional, default: "default"): The encoder mode. Can be "default", or "sanger".
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified.
@@ -54,10 +53,9 @@ module Tools
     function encode_multiple(
         path_to_context = "../data/contexts/",
         context_filename = "context",
+        context_extension = ".txt",
         context_file_no = 2;
-        merge_mult = 1,
         encoder_mode = "sanger",
-        exclude = [""],
         fragment_size = 1,
         fragment_groups = 1
     )
@@ -65,7 +63,7 @@ module Tools
 
         contexts = []
         for i in 1:context_file_no
-            context = read("$path_to_context$context_filename$i.txt", String)
+            context = read("$path_to_context$context_filename$i$context_extension", String)
             push!(contexts, context)
         end
 
