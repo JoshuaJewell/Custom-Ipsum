@@ -14,8 +14,8 @@ Random.seed!(123)
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
-tensorsmult = encode_multiple(
-    "/home/joshua/Documents/paststatuses-split/", #shh, don't tell anyone how badly organised my directory structure is...
+tensors = encode_multiple(
+    "/home/joshua/Documents/paststatuses-split/",
     "",
     "",
     26,
@@ -27,9 +27,9 @@ tensorsmult = encode_multiple(
 context = read("/home/joshua/Documents/paststatuses.txt", String)
 tensorsone = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-#open("./data/models/wastatustest.ctensors", "w") do file
-#    serialize(file, tensors)
-#end
+open("./data/models/wastatus.ctensors", "w") do file
+    serialize(file, tensors)
+end
 
 #tensors1 = open("./data/models/wastatustest.ctensors", "r") do file
 #    deserialize(file)
@@ -43,15 +43,6 @@ tensorsone = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 println("One file.")
 println(decode(
     tensorsone,
-    temperature=1,
-    stream=false,
-    show_tokens=false,
-    max_tokens=64
-))
-
-println("Merged multiple.")
-println(decode(
-    tensorsmult,
     temperature=1,
     stream=false,
     show_tokens=false,

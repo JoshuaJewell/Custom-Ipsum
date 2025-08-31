@@ -113,8 +113,8 @@ module Tools
                 (Threads.threadid() == 3) ? print("\x1b[2A\rThread 3 encoding file $(i-start+1) of $(stop-start+1)...\x1b[2B") : nothing
                 (Threads.threadid() == 4) ? print("\x1b[1A\rThread 4 encoding file $(i-start+1) of $(stop-start+1)...\x1b[1B") : nothing
                 if encoder_mode == "sanger"
-                    tensor = sanger_encoder(context, fragment_size, fragment_groups, exclude, false)
-                    args = "Fragmentation: $fragment_size by $fragment_groups. $exclude excluded."
+                    tensor = sanger_encoder(context, fragment_size, fragment_groups, false)
+                    args = "Fragmentation: $fragment_size by $fragment_groups."
                 else
                     tensor = default_encoder(context, verbose=false)
                     args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens. $exclude excluded."
