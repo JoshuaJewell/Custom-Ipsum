@@ -32,12 +32,13 @@ module Tools
     end
 
     """
-        function encode_multiple(path_to_context = "../data/contexts/", context_filename = "context", context_file_no; mode = "equal")
+        function encode_multiple(path_to_context = "../data/contexts/", encoder_mode = "sanger", fragment_size = 1, fragment_groups = 1)
     
-    Encodes multiple contexts from a set of files and merges the weights. Store contexts in format:
+    Encodes multiple contexts from a set of files and merges the weights. Recommended to store contexts in format:
         context1.txt
         context2.txt
         etc...
+    But will read all files in dir.
 
     ## Arguments
     - `path_to_context` (default: "../data/contexts/"): Where your context files to encode and merge are.
@@ -51,10 +52,7 @@ module Tools
 
     """
     function encode_multiple(
-        path_to_context = "../data/contexts/",
-        context_filename = "context",
-        context_extension = ".txt",
-        context_file_no = 2;
+        path_to_context = "../data/contexts/";
         encoder_mode = "sanger",
         fragment_size = 1,
         fragment_groups = 1
@@ -62,8 +60,11 @@ module Tools
         encoder_mode = lowercase(encoder_mode)
 
         contexts = []
-        for i in 1:context_file_no
-            context = read("$path_to_context$context_filename$i$context_extension", String)
+        files = readdir(path_to_context)
+
+        for file in files
+            # Read each file's content
+            context = read(joinpath(path_to_context, file), String)
             push!(contexts, context)
         end
 

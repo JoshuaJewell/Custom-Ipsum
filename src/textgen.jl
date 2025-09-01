@@ -15,19 +15,16 @@ Random.seed!(123)
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
 tensors = encode_multiple(
-    "/home/joshua/Documents/paststatuses-split/",
-    "",
-    "",
-    26,
+    "./src/",
     encoder_mode = "sanger",
     fragment_size = 5,
     fragment_groups = 3, 
 )
 
-context = read("/home/joshua/Documents/paststatuses.txt", String)
-tensorsone = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
+#context = read("/home/joshua/Documents/paststatuses.txt", String)
+#tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-open("./data/models/wastatus.ctensors", "w") do file
+open("./data/models/custom_ipsum_src.ctensors", "w") do file
     serialize(file, tensors)
 end
 
@@ -40,13 +37,12 @@ end
 
 #tensorsmerged = merge_ctensors(tensors1, tensors2)
 
-println("One file.")
 println(decode(
-    tensorsone,
+    tensors,
     temperature=1,
     stream=false,
     show_tokens=false,
-    max_tokens=64
+    max_tokens=512
 ))
 
 #tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
