@@ -117,33 +117,33 @@ module Encoder
             tokens = sanger_split(context, fragment_size, fragment_groups)
         end
 
-            # Build vocabulary
-    unique_tokens = unique(tokens)
-    pushfirst!(unique_tokens, "<BOS>")  # Ensure BOS is index 1
-    
-    token_to_id = Dict(token => i for (i, token) in enumerate(unique_tokens))
-    id_to_token = unique_tokens
-    
-    # Build numeric Markov chain
-    markov_dict = Dict{Int, Dict{Int, Float64}}()
-    bos_id = token_to_id["<BOS>"]
-    markov_dict[bos_id] = Dict{Int, Float64}()
-    
-    tokencount = length(tokens)
-    for i in 1:tokencount-1
-        current_id = token_to_id[tokens[i]]
-        next_id = token_to_id[tokens[i+1]]
+        # Build vocabulary
+        unique_tokens = unique(tokens)
+        pushfirst!(unique_tokens, "<BOS>")  # Ensure BOS is index 1
         
-        if !haskey(markov_dict, current_id)
-            markov_dict[current_id] = Dict{Int, Float64}()
-        end
-        markov_dict[current_id][next_id] = get(markov_dict[current_id], next_id, 0.0) + 1.0
+        token_to_id = Dict(token => i for (i, token) in enumerate(unique_tokens))
+        id_to_token = unique_tokens
         
-        # Handle BOS transitions
-        if i == 1 || endswith(tokens[i], "\n")
-            markov_dict[bos_id][next_id] = get(markov_dict[bos_id], next_id, 0.0) + 1.0
+        # Build numeric Markov chain
+        markov_dict = Dict{Int, Dict{Int, Float64}}()
+        bos_id = token_to_id["<BOS>"]
+        markov_dict[bos_id] = Dict{Int, Float64}()
+        
+        tokencount = length(tokens)
+        for i in 1:tokencount-1
+            current_id = token_to_id[tokens[i]]
+            next_id = token_to_id[tokens[i+1]]
+            
+            if !haskey(markov_dict, current_id)
+                markov_dict[current_id] = Dict{Int, Float64}()
+            end
+            markov_dict[current_id][next_id] = get(markov_dict[current_id], next_id, 0.0) + 1.0
+            
+            # Handle BOS transitions
+            if i == 1 || endswith(tokens[i], "\n")
+                markov_dict[bos_id][next_id] = get(markov_dict[bos_id], next_id, 0.0) + 1.0
+            end
         end
-    end
 
         return markov_dict, token_to_id, id_to_token
     end
