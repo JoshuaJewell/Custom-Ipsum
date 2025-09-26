@@ -14,17 +14,17 @@ Random.seed!(123)
 
 #print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
 
-tensors = encode_multiple(
-    "./src/",
-    encoder_mode = "sanger",
-    fragment_size = 5,
-    fragment_groups = 3, 
-)
+#tensors = encode_multiple(
+#    "../json",
+#    encoder_mode = "sanger",
+#    fragment_size = 5,
+#    fragment_groups = 4, 
+#)
 
-#context = read("/home/joshua/Documents/paststatuses.txt", String)
-#tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
+context = read("/home/joshua/Documents/jis.txt", String)
+tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-open("./data/models/custom_ipsum_src.ctensors", "w") do file
+open("./data/models/clinton-emails.ctensors", "w") do file
     serialize(file, tensors)
 end
 
@@ -49,6 +49,6 @@ println(decode(
         
 #print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
 
-# discard 'clean' cuts might help preserve coherence?
 # use default_encoder to check output of sanger_encoder?
 # CompleteTensors tools
+# Independent chains with own "personalities" to create dialogue. This will require some global coherence to make any sense at all.

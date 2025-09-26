@@ -1,6 +1,6 @@
 module Types
 
-    export Header, CompleteTensors
+    export Header, CompleteTensors, Vocabulary
 
     ## CompleteTensors V1
     #struct Header
@@ -34,16 +34,28 @@ module Types
     #    forward_markov::Dict{String, Dict{String, Float64}}
     #end
 
+    struct Vocabulary
+        token_to_id::Dict{String, Int}
+        id_to_token::Vector{String}
+    end
+
     ## CompleteTensors V0
     struct Header
         encoding_method::String
         metadata::String
     end
     
+    #struct CompleteTensors
+    #    header::Header
+    #    forward_markov::Dict{String, Dict{String, Float64}}
+    #    reverse_markov::Dict{String, Dict{String, Float64}}
+    #    token_index::Vector{String}
+    #end
+
     struct CompleteTensors
         header::Header
-        forward_markov::Dict{String, Dict{String, Float64}}
-        reverse_markov::Dict{String, Dict{String, Float64}}
-        token_index::Vector{String}
+        vocabulary::Vocabulary
+    #   forward_markov::Dict{String, Dict{String, Float64}}
+        forward_markov::Dict{Int, Dict{Int, Float64}}
     end
 end

@@ -86,13 +86,15 @@ module Tools
                     if final_merged_tensors === nothing
                         final_merged_tensors = result
                     else
-                        final_merged_tensors = merge_tensordicts(final_merged_tensors, result)
+                        final_merged_tensors = merge_complete_tensors(final_merged_tensors.header,
+                            final_merged_tensors.forward_markov, result.forward_markov,
+                            final_merged_tensors.vocabulary.id_to_token, result.vocabulary.id_to_token)
                     end
                 end
                 finished_count += 1
             end
 
-            tensors = pack_ctensors(encoder_mode, args, final_merged_tensors)
+            tensors = final_merged_tensors
 
             return tensors
         end
@@ -105,7 +107,9 @@ module Tools
             end
 
             print("\x1b[5A\rFour threads sample:\x1b[5B")
+
             local_tensor = nothing
+
             for i in start:stop
                 context = contexts[i]
 
@@ -113,18 +117,15 @@ module Tools
                 (Threads.threadid() == 2) ? print("\x1b[3A\rThread 2 encoding file $(i-start+1) of $(stop-start+1)...\x1b[3B") : nothing
                 (Threads.threadid() == 3) ? print("\x1b[2A\rThread 3 encoding file $(i-start+1) of $(stop-start+1)...\x1b[2B") : nothing
                 (Threads.threadid() == 4) ? print("\x1b[1A\rThread 4 encoding file $(i-start+1) of $(stop-start+1)...\x1b[1B") : nothing
-                if encoder_mode == "sanger"
-                    tensor = sanger_encoder(context, fragment_size, fragment_groups, false)
-                    args = "Fragmentation: $fragment_size by $fragment_groups."
-                else
-                    tensor = default_encoder(context, verbose=false)
-                    args = "Sentence enders: $end_punctuation; Preserved tokens: $preserve_tokens. $exclude excluded."
-                end
+                
+                tensor = encode(context, encoder_mode; fragment_size = fragment_size, fragment_groups = fragment_groups, verbose = false)
 
                 if local_tensor === nothing
                     local_tensor = tensor
                 else
-                    local_tensor = merge_tensordicts(local_tensor, tensor)
+                    local_tensor = merge_complete_tensors(local_tensor.header, 
+                        local_tensor.forward_markov, tensor.forward_markov,
+                        local_tensor.vocabulary.id_to_token, tensor.vocabulary.id_to_token)
                 end
             end
 
@@ -145,8 +146,8 @@ module Tools
     - `merge_mult`: Tensordict the second.
     """
     function merge_ctensors(
-        tensorsfile1,
-        tensorsfile2;
+        tensors1,
+        tensors2;
         merge_mult = 1
     )
         if (tensorsfile1.header != tensorsfile2.header) || (tensorsfile1.header.encoding_method == "unkown")
@@ -155,26 +156,28 @@ module Tools
             print("Headers match, proceeding to merge.")
         end
 
-        tensors1 = unpack_ctensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
-        tensors2 = unpack_ctensors(tensorsfile2) #          1            2            3               4             5
+        #tensors1 = unpack_ctensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
+        #tensors2 = unpack_ctensors(tensorsfile2) #          1            2            3               4             5
 
         # Merge markov chains
         merged_forward_markov = merge_tensordicts(
-            tensors1[3],
-            tensors2[3];
+            tensors1.forward_markov,
+            tensors2.forward_markov;
             merge_mult = merge_mult
         )
-        merged_reverse_markov = merge_tensordicts(
-            tensors1[4],
-            tensors2[4];
-            merge_mult = merge_mult
-        )
+        #merged_reverse_markov = merge_tensordicts(
+        #    tensors1.reverse_markov,
+        #    tensors2.reverse_markov;
+        #    merge_mult = merge_mult
+        #)
+
+
 
         # Concatenate token_index (not using it yet anyway sooo...)
-        merged_token_index = vcat(tensors1[5], tensors2[5])
+        #merged_token_index = vcat(tensors1[5], tensors2[5])
 
         # Create new CompleteTensors instance
-        merged_tensor = pack_ctensors(tensors1[1], tensors1[2], merged_forward_markov, merged_reverse_markov, merged_token_index)
+        merged_tensor = pack_ctensors(tensors1.encoding_method, tensors1.metadata, merged_forward_markov, token_to_id, id_to_token) #, merged_reverse_markov, merged_token_index)
 
         return merged_tensor
     end

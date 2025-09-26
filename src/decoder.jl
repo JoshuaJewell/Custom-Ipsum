@@ -37,11 +37,11 @@ module Decoder
 
         println("Decoding in $(mode) mode.")
         if mode == "sanger"
-            output = sanger_decoder(tensors.forward_markov, max_tokens, stream, stream_rate, show_tokens, temperature)
+            output = sanger_decoder(tensors, max_tokens, stream, stream_rate, show_tokens, temperature)
         elseif mode == "beamsearch"
-            output = beam_search_decoder(tensors.forward_markov, max_tokens, beam_width)
+            output = beam_search_decoder(tensors, max_tokens, beam_width)
         else
-            output = default_decoder(tensors.forward_markov, max_tokens, stream, stream_rate, temperature)
+            output = default_decoder(tensors, max_tokens, stream, stream_rate, temperature)
         end
         
         println("\nDecoded in $(time() - initT) s")
@@ -120,26 +120,20 @@ module Decoder
         if max_tokens == 0
             return ""
         end
-
+        
         text = []
-        current_token = "<BOS>"
-        init_token = true
-
-        if stream
-            if stream_rate > 0
-                stream_rate = 1 / stream_rate
-            end
-        end
-
+        current_id = tensors.vocabulary.token_to_id["<BOS>"]
+        
         for i in 2:max_tokens
-            if !haskey(tensors, current_token)
+            if !haskey(tensors.forward_markov, current_id)
                 break
             end
-
-            selected_token, prob = default_sampler(tensors, current_token, temperature)
-
-            current_token = selected_token
-            push!(text, current_token)
+            
+            selected_id, prob = default_sampler(tensors.forward_markov, current_id, temperature)
+            selected_token = tensors.vocabulary.id_to_token[selected_id]
+            
+            current_id = selected_id
+            push!(text, selected_token)
 
             if stream
                 stream_token = current_token
@@ -159,13 +153,8 @@ module Decoder
             end
             init_token = false
         end
-        if !stream
-            if show_tokens
-                return join(text, "\n\$")
-            else
-                return join(text)
-            end
-        end
+
+        return stream ? nothing : join(text)
     end
 
     function beam_search_decoder(

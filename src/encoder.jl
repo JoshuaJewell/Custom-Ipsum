@@ -4,7 +4,7 @@ module Encoder
 
     using .Types, .Utils
 
-    export encode, sanger_encoder, default_encoder
+    export encode
 
     """
         encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
@@ -38,7 +38,7 @@ module Encoder
         initT = time()
         
         if mode == "sanger"
-            markov_dict = sanger_encoder(context, fragment_size, fragment_groups, verbose)
+            markov_dict, token_to_id, id_to_token = sanger_encoder(context, fragment_size, fragment_groups, verbose)
             args = "Fragmentation: $fragment_size by $fragment_groups."
         else
             markov_dict = default_encoder(context, end_punctuation, exclude, verbose)
@@ -47,7 +47,8 @@ module Encoder
 
         verbose && println("\nEncoded in $(time() - initT) s")
 
-        tensors = pack_ctensors(mode, args, markov_dict)
+        #tensors = pack_ctensors(mode, args, markov_dict)
+        tensors = pack_ctensors(mode, args, markov_dict, token_to_id, id_to_token)
 
         return tensors
     end
@@ -116,37 +117,34 @@ module Encoder
             tokens = sanger_split(context, fragment_size, fragment_groups)
         end
 
-        # Initialize the Markov dictionary and BOS token
-        markov_dict = Dict{String, Dict{String, Float64}}()
-        init_token = "<BOS>"
-        pushfirst!(tokens)
-        markov_dict[init_token] = Dict{String, Float64}()
-
-        # Iterate through the tokens to build the Markov chain
-        tokencount = length(tokens)
-
-        for i in 1:tokencount-1
-            current_token = tokens[i]
-            next_token = tokens[i+1]
-            if !haskey(markov_dict, current_token)
-                markov_dict[current_token] = Dict{String, Float64}()
-            end
-            if !haskey(markov_dict[current_token], next_token)
-                markov_dict[current_token][next_token] = 0.0
-            end
-            markov_dict[current_token][next_token] += 1.0
-
-            progress = round(100 * i / tokencount, digits = 2)
-
-            if i == 1 || endswith(current_token, "\n")
-                markov_dict[init_token][next_token] = get(markov_dict[init_token], next_token, 0) + 1
-            else
-                if !haskey(markov_dict, current_token)
-                    markov_dict[current_token] = Dict{String, Float64}()
-                end
-                markov_dict[current_token][next_token] = get(markov_dict[current_token], next_token, 0) + 1
-            end            
+            # Build vocabulary
+    unique_tokens = unique(tokens)
+    pushfirst!(unique_tokens, "<BOS>")  # Ensure BOS is index 1
+    
+    token_to_id = Dict(token => i for (i, token) in enumerate(unique_tokens))
+    id_to_token = unique_tokens
+    
+    # Build numeric Markov chain
+    markov_dict = Dict{Int, Dict{Int, Float64}}()
+    bos_id = token_to_id["<BOS>"]
+    markov_dict[bos_id] = Dict{Int, Float64}()
+    
+    tokencount = length(tokens)
+    for i in 1:tokencount-1
+        current_id = token_to_id[tokens[i]]
+        next_id = token_to_id[tokens[i+1]]
+        
+        if !haskey(markov_dict, current_id)
+            markov_dict[current_id] = Dict{Int, Float64}()
         end
-        return markov_dict
+        markov_dict[current_id][next_id] = get(markov_dict[current_id], next_id, 0.0) + 1.0
+        
+        # Handle BOS transitions
+        if i == 1 || endswith(tokens[i], "\n")
+            markov_dict[bos_id][next_id] = get(markov_dict[bos_id], next_id, 0.0) + 1.0
+        end
+    end
+
+        return markov_dict, token_to_id, id_to_token
     end
 end

@@ -3,7 +3,7 @@ module Utils
 
     using .Types
 
-    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors
 
     function average_word_length(
         text::String,
@@ -177,24 +177,104 @@ module Utils
         return d1
     end
 
-    function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{String, Dict{String, Float64}}(), reverse_markov = Dict{String, Dict{String, Float64}}(), token_index = [""])
+    #function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{String, Dict{String, Float64}}(), reverse_markov = Dict{String, Dict{String, Float64}}(), token_index = [""])
+    #    ctensors = CompleteTensors(
+    #        Header(encoding_method, metadata),
+    #        forward_markov,
+    #        reverse_markov, 
+    #        token_index
+    #    )
+
+    #    return ctensors
+    #end
+
+    function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{Int, Dict{Int, Float64}}(), token_to_id = Dict{String, Int}(), id_to_token = Vector{String}())
         ctensors = CompleteTensors(
             Header(encoding_method, metadata),
-            forward_markov,
-            reverse_markov, 
-            token_index
+            Vocabulary(token_to_id, id_to_token),
+            forward_markov
         )
 
         return ctensors
     end
 
-    function unpack_ctensors(ctensors)
-        encoding_method = ctensors.header.encoding_method
-        metadata = ctensors.header.metadata
-        forward_markov = ctensors.forward_markov
-        reverse_markov = ctensors.reverse_markov
-        token_index = ctensors.token_index
+    ##############################################
 
-        return encoding_method, metadata, forward_markov, reverse_markov, token_index
+    function merge_complete_tensors(header, markov1, markov2, id_to_token1, id_to_token2)
+        # Step 1: Count token frequencies
+        token_frequency = Dict{String, Int}()
+
+        function count_frequencies(forward_markov, id_to_token)
+            for (id, transitions) in forward_markov
+                token = id_to_token[id]
+                token_frequency[token] = get(token_frequency, token, 0) + sum(values(transitions))
+            end
+        end
+
+        count_frequencies(markov1, id_to_token1)
+        count_frequencies(markov2, id_to_token2)
+
+        # Step 2: Create a combined vocabulary sorted by frequency
+        combined_tokens = Set{String}()
+        for token in keys(token_frequency)
+            push!(combined_tokens, token)
+        end
+
+        sorted_tokens = sort(collect(combined_tokens), by = x -> -get(token_frequency, x, 0))
+
+        # Create new vocabulary
+        new_token_to_id = Dict{String, Int}()
+        new_id_to_token = Vector{String}()
+        for (id, token) in enumerate(sorted_tokens)
+            new_token_to_id[token] = id
+            push!(new_id_to_token, token)
+        end
+        new_vocabulary = Vocabulary(new_token_to_id, new_id_to_token)
+
+        # Step 3: Remap forward_markov dictionaries
+        new_forward_markov = Dict{Int, Dict{Int, Float64}}()
+
+        function remap_ids(forward_markov::Dict{Int, Dict{Int, Float64}}, id_to_token)
+            remapped = Dict{Int, Dict{Int, Float64}}()
+            for (old_id, transitions) in forward_markov
+                token = id_to_token[old_id]
+                new_id = new_token_to_id[token]
+                remapped[new_id] = Dict{Int, Float64}()
+                for (next_id, prob) in transitions
+                    next_token = id_to_token[next_id]
+                    new_next_id = new_token_to_id[next_token]
+                    remapped[new_id][new_next_id] = get(remapped[new_id], new_next_id, 0.0) + prob
+                end
+            end
+            return remapped
+        end
+
+        remapped_markov1 = remap_ids(markov1, id_to_token1)
+        remapped_markov2 = remap_ids(markov2, id_to_token2)
+
+        # Step 4: Merge the remapped forward_markov dictionaries
+        for (id, transitions) in remapped_markov1
+            if haskey(new_forward_markov, id)
+                for (next_id, prob) in transitions
+                    new_forward_markov[id][next_id] = get(new_forward_markov[id], next_id, 0.0) + prob
+                end
+            else
+                new_forward_markov[id] = transitions
+            end
+        end
+
+        for (id, transitions) in remapped_markov2
+            if haskey(new_forward_markov, id)
+                for (next_id, prob) in transitions
+                    new_forward_markov[id][next_id] = get(new_forward_markov[id], next_id, 0.0) + prob
+                end
+            else
+                new_forward_markov[id] = transitions
+            end
+        end
+
+        # Create the merged CompleteTensors
+        return CompleteTensors(Header(header.encoding_method,header.metadata), new_vocabulary, new_forward_markov)
     end
+
 end
