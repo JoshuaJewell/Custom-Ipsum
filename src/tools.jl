@@ -1,16 +1,12 @@
 module Tools
-    include("types.jl")
-    include("encoder.jl")
-    include("decoder.jl")
-    include("utils.jl")
-
-    using .Types, .Encoder, .Decoder, Distributed, .Utils
+    using ..Types, ..Encoder, ..Decoder, ..Utils
+    using Distributed
 
     export encode_multiple, encoder_decoder, merge_ctensors
 
     function encoder_decoder(
         context,
-        mode = "default";
+        mode = "sanger";
         end_punctuation = [".", "!", "?"], 
         exclude = [" ", "(", ")", "\"", "*"], 
         fragment_size = 1,
@@ -150,35 +146,31 @@ module Tools
         tensors2;
         merge_mult = 1
     )
-        if (tensorsfile1.header != tensorsfile2.header) || (tensorsfile1.header.encoding_method == "unkown")
-            error("Headers do not match")
-        else
-            print("Headers match, proceeding to merge.")
+        if (tensors1.header.encoding_method != tensors2.header.encoding_method) || (tensors1.header.encoding_method == "unknown")
+            error("Headers do not match (got '$(tensors1.header.encoding_method)' and '$(tensors2.header.encoding_method)').")
         end
 
-        #tensors1 = unpack_ctensors(tensorsfile1) # (encoding_method, metadata, forward_markov, reverse_markov, token_index)
-        #tensors2 = unpack_ctensors(tensorsfile2) #          1            2            3               4             5
+        # The two models hold independent vocabularies, so a given integer id in
+        # one does not denote the same token in the other. merge_complete_tensors
+        # rebuilds a combined vocabulary and remaps both chains before summing;
+        # naively merging the integer-keyed dicts would conflate unrelated tokens.
 
-        # Merge markov chains
-        merged_forward_markov = merge_tensordicts(
+        # Scale the second model's transition counts so it contributes at the
+        # requested ratio relative to the first (the README's weighting use-case).
+        scaled_markov2 = tensors2.forward_markov
+        if merge_mult != 1
+            scaled_markov2 = Dict{Int, Dict{Int, Float64}}()
+            for (id, transitions) in tensors2.forward_markov
+                scaled_markov2[id] = Dict{Int, Float64}(next_id => weight * merge_mult for (next_id, weight) in transitions)
+            end
+        end
+
+        return merge_complete_tensors(
+            tensors1.header,
             tensors1.forward_markov,
-            tensors2.forward_markov;
-            merge_mult = merge_mult
+            scaled_markov2,
+            tensors1.vocabulary.id_to_token,
+            tensors2.vocabulary.id_to_token
         )
-        #merged_reverse_markov = merge_tensordicts(
-        #    tensors1.reverse_markov,
-        #    tensors2.reverse_markov;
-        #    merge_mult = merge_mult
-        #)
-
-
-
-        # Concatenate token_index (not using it yet anyway sooo...)
-        #merged_token_index = vcat(tensors1[5], tensors2[5])
-
-        # Create new CompleteTensors instance
-        merged_tensor = pack_ctensors(tensors1.encoding_method, tensors1.metadata, merged_forward_markov, token_to_id, id_to_token) #, merged_reverse_markov, merged_token_index)
-
-        return merged_tensor
     end
 end

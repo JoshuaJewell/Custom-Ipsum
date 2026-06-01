@@ -1,19 +1,16 @@
 module Encoder
-    include("types.jl")
-    include("utils.jl")
-
-    using .Types, .Utils
+    using ..Types, ..Utils
 
     export encode
 
     """
-        encode(context, mode = "default"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
-    
+        encode(context, mode = "sanger"; end_punctuation = [".", "!", "?"], exclude = [" ", "(", ")", "\\"", "*"], preserve_tokens=["'s", "'t", "'m", "'ve", "'d"], fragment_size = 1)
+
     Encode the given context using the specified mode.
 
     ## Arguments
     - `context`: The input string to decode.
-    - `mode` (optional, default: "default"): The decoding mode. Can be "default" or "sanger".
+    - `mode` (optional, default: "sanger"): The encoding mode. Only "sanger" is currently supported; "default" is legacy and raises an informative error pending a rewrite onto the numeric model.
     
     ## Keyword Arguments
     - `end_punctuation` (optional, default: [".", "!", "?"]): Markers for ends of sentences. Only relevant if `mode` is "default".
@@ -25,34 +22,37 @@ module Encoder
     """
     function encode(
         context,
-        mode = "default";
-        end_punctuation = [".", "!", "?"], 
-        exclude = String[], 
+        mode = "sanger";
+        end_punctuation = [".", "!", "?"],
+        exclude = String[],
         fragment_size = 1,
         fragment_groups = 1,
         verbose = true
     )
-        mode = lowercase(mode)    
+        mode = lowercase(mode)
+
+        # Only "sanger" is currently supported. The "default" encoder below is
+        # legacy: it produces a string-keyed Dict that the numeric CompleteTensors
+        # type can no longer hold. Guard here rather than fail cryptically later.
+        if mode != "sanger"
+            error("Encoder mode '$mode' is not supported; only \"sanger\" is. " *
+                  "(The \"default\" path is legacy, pending a rewrite onto the numeric model.)")
+        end
 
         verbose && println("Encoding in $mode mode.")
         initT = time()
-        
-        if mode == "sanger"
-            markov_dict, token_to_id, id_to_token = sanger_encoder(context, fragment_size, fragment_groups, verbose)
-            args = "Fragmentation: $fragment_size by $fragment_groups."
-        else
-            markov_dict = default_encoder(context, end_punctuation, exclude, verbose)
-            args = "Sentence enders: $end_punctuation; Preserved tokens: \$preserve_tokens."
-        end
+
+        markov_dict, token_to_id, id_to_token = sanger_encoder(context, fragment_size, fragment_groups, verbose)
+        args = "Fragmentation: $fragment_size by $fragment_groups."
 
         verbose && println("\nEncoded in $(time() - initT) s")
 
-        #tensors = pack_ctensors(mode, args, markov_dict)
         tensors = pack_ctensors(mode, args, markov_dict, token_to_id, id_to_token)
 
         return tensors
     end
 
+    ## LEGACY
     function default_encoder(
         context,
         end_punctuation = [".", "!", "?"],

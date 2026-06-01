@@ -1,7 +1,5 @@
 module Utils
-    include("types.jl")
-
-    using .Types
+    using ..Types
 
     export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors
 
@@ -202,7 +200,8 @@ module Utils
 
     function merge_complete_tensors(header, markov1, markov2, id_to_token1, id_to_token2)
         # Step 1: Count token frequencies
-        token_frequency = Dict{String, Int}()
+        # Float64, not Int: weights may be fractional once merge_mult scales them.
+        token_frequency = Dict{String, Float64}()
 
         function count_frequencies(forward_markov, id_to_token)
             for (id, transitions) in forward_markov

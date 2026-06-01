@@ -1,8 +1,5 @@
 module Decoder
-    include("types.jl")
-    include("utils.jl")
-
-    using .Types, .Utils 
+    using ..Types, ..Utils
 
     export decode
 
@@ -35,15 +32,18 @@ module Decoder
 
         mode = tensors.header.encoding_method
 
-        println("Decoding in $(mode) mode.")
-        if mode == "sanger"
-            output = sanger_decoder(tensors, max_tokens, stream, stream_rate, show_tokens, temperature)
-        elseif mode == "beamsearch"
-            output = beam_search_decoder(tensors, max_tokens, beam_width)
-        else
-            output = default_decoder(tensors, max_tokens, stream, stream_rate, temperature)
+        # Only the numeric "sanger" model is currently supported. The "default"
+        # and "beamsearch" decoders below are legacy, kept against the abandoned
+        # string-keyed API; guard here so an old model fails clearly rather than
+        # crashing cryptically deep inside an unsupported path.
+        if mode != "sanger"
+            error("Decoding mode '$mode' is not supported; only \"sanger\" models can be decoded. " *
+                  "(\"default\" and \"beamsearch\" are legacy, pending a rewrite onto the numeric model.)")
         end
-        
+
+        println("Decoding in $(mode) mode.")
+        output = sanger_decoder(tensors, max_tokens, stream, stream_rate, show_tokens, temperature)
+
         println("\nDecoded in $(time() - initT) s")
         
         if !stream
@@ -51,6 +51,7 @@ module Decoder
         end
     end
 
+    ## LEGACY
     function default_decoder(tensors, max_tokens=128, stream=false, stream_rate=0, temperature=1)
         if max_tokens == 0
             return ""
@@ -123,40 +124,36 @@ module Decoder
         
         text = []
         current_id = tensors.vocabulary.token_to_id["<BOS>"]
-        
+
+        # Treat stream_rate as tokens per second; 0 means stream with no delay.
+        delay = (stream && stream_rate > 0) ? 1 / stream_rate : 0
+
         for i in 2:max_tokens
             if !haskey(tensors.forward_markov, current_id)
                 break
             end
-            
+
             selected_id, prob = default_sampler(tensors.forward_markov, current_id, temperature)
             selected_token = tensors.vocabulary.id_to_token[selected_id]
-            
+
             current_id = selected_id
             push!(text, selected_token)
 
             if stream
-                stream_token = current_token
-
-                if init_token == true
-                    stream_token = uppercase(stream_token[1]) * lowercase(stream_token[2:end])
+                delay > 0 && sleep(delay)
+                if show_tokens
+                    print(selected_token, "\$$(prob)")
+                else
+                    print(selected_token)
                 end
-
-                if stream_token!== nothing
-                    if show_tokens
-                        print(stream_token, "\$$(prob)")
-                    else
-                        print(stream_token)
-                    end
-                    flush(stdout)
-                end            
+                flush(stdout)
             end
-            init_token = false
         end
 
         return stream ? nothing : join(text)
     end
 
+    ## LEGACY (unsupported)
     function beam_search_decoder(
         tensors,
         max_tokens=128,

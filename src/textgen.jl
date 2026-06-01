@@ -1,54 +1,35 @@
-include("decoder.jl")
-include("encoder.jl")
-include("tools.jl")
-
+using CustomIpsum
 using Random, Serialization
-
-using .Decoder, .Encoder, .Tools
 
 Random.seed!(123)
 
-# Reading from data
-#finewebcontext = read("./data/contexts/fineweb-top5000.txt", String)
- 
+const REPO = joinpath(@__DIR__, "..")
 
-#print(decode(encode_multiple("./data/contexts/", "localsample", 4), max_tokens = 512))
+## Read command-line arguments
+# Usage: julia src/textgen.jl [context_file] [max_tokens]
+# Both are optional; a relative context path resolves against the working directory.
+context_path = length(ARGS) >= 1 ? ARGS[1] : joinpath(REPO, "data", "contexts", "macbeth.txt")
+max_tokens = length(ARGS) >= 2 ? parse(Int, ARGS[2]) : 512
 
-#tensors = encode_multiple(
-#    "../json",
-#    encoder_mode = "sanger",
-#    fragment_size = 5,
-#    fragment_groups = 4, 
-#)
-
-context = read("/home/joshua/Documents/jis.txt", String)
+## Build a model from the chosen context and generate from it
+context = read(context_path, String)
 tensors = encode(context, "sanger", fragment_size = 5, fragment_groups = 3)
 
-open("./data/models/clinton-emails.ctensors", "w") do file
+## Persist the model to a local-scoped (gitignored) output
+# The name follows the context so different corpora do not overwrite one another.
+context_name = splitext(basename(context_path))[1]
+open(joinpath(REPO, "data", "models", "local-$(context_name).ctensors"), "w") do file
     serialize(file, tensors)
 end
 
-#tensors1 = open("./data/models/wastatustest.ctensors", "r") do file
-#    deserialize(file)
-#end
-#tensors2 = open("./data/models/wastatustest.ctensors", "r") do file
-#    deserialize(file)
-#end
-
-#tensorsmerged = merge_ctensors(tensors1, tensors2)
-
 println(decode(
     tensors,
-    temperature=1,
-    stream=false,
-    show_tokens=false,
-    max_tokens=512
+    temperature = 1,
+    stream = false,
+    show_tokens = false,
+    max_tokens = max_tokens
 ))
 
-#tensors = encode(context, "sanger", end_punctuation=end_punctuation, exclude=exclude, fragment_size=fragment_size, fragment_groups=fragment_groups),
-        
-#print(encoder_decoder(context, "sanger", fragment_size = 5, fragment_groups = 3, temperature=0.8, stream=false, show_tokens=false, max_tokens=256))
-
-# use default_encoder to check output of sanger_encoder?
-# CompleteTensors tools
-# Independent chains with own "personalities" to create dialogue. This will require some global coherence to make any sense at all.
+## Design notes for later
+# Independent chains with their own "personalities" to create dialogue. This
+# will require some global coherence to make any sense at all.

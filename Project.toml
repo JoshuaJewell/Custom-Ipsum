@@ -1,0 +1,18 @@
+name = "CustomIpsum"
+uuid = "3f43e961-1674-4ed4-bb3a-2c5b676dead8"
+authors = ["Joshua Jewell"]
+version = "0.1.0"
+
+[deps]
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Serialization = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[compat]
+julia = "1.6"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
