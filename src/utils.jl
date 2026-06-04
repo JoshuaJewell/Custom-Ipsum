@@ -1,7 +1,7 @@
 module Utils
     using ..Types
 
-    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors, delimiter_event, scan_depth_classes
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, sample_next, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors, delimiter_event, scan_depth_classes
 
     # Characters that bound a quote: a missing neighbour, whitespace, brackets,
     # and the punctuation a closing quote may sit against.
@@ -195,6 +195,15 @@ module Utils
             end
         end
         return selected_token, selected_prob
+    end
+
+    # Advance one step in a Markov table: sample the next (id, probability) from
+    # `current_id`, or return `nothing` when the state has no continuation. This
+    # is the single shared step beneath the numeric decoders; each caller decides
+    # what a dead-end means (stop, close a delimiter, hand the baton over).
+    function sample_next(table, current_id, temperature)
+        haskey(table, current_id) || return nothing
+        return default_sampler(table, current_id, temperature)
     end
 
     function merge_tensordicts(

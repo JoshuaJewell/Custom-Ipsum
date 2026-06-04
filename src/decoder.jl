@@ -132,11 +132,10 @@ module Decoder
         delay = (stream && stream_rate > 0) ? 1 / stream_rate : 0
 
         for i in 2:max_tokens
-            if !haskey(tensors.forward_markov, current_id)
-                break
-            end
+            step = sample_next(tensors.forward_markov, current_id, temperature)
+            step === nothing && break
 
-            selected_id, prob = default_sampler(tensors.forward_markov, current_id, temperature)
+            selected_id, prob = step
             selected_token = tensors.vocabulary.id_to_token[selected_id]
 
             current_id = selected_id
@@ -196,10 +195,11 @@ module Decoder
         end
 
         for i in 2:max_tokens
-            # Resolve dead-ends: inside an interior with nowhere to go, close one
-            # level and retry; at depth zero, stop.
+            # Advance the active table; on exhaustion, close one interior level
+            # and retry, or stop at depth zero.
+            step = sample_next(table(), current_id, temperature)
             dead = false
-            while !haskey(table(), current_id)
+            while step === nothing
                 if isempty(stack)
                     dead = true
                     break
@@ -208,10 +208,11 @@ module Decoder
                 g = CLASS_CLOSE[cls]
                 emit(string(g))
                 prevchar = g
+                step = sample_next(table(), current_id, temperature)
             end
             dead && break
 
-            selected_id, prob = default_sampler(table(), current_id, temperature)
+            selected_id, prob = step
             selected_token = tensors.vocabulary.id_to_token[selected_id]
             current_id = selected_id
 
