@@ -118,6 +118,9 @@ module Decoder
     end
 
     function sanger_decoder(tensors, max_tokens=128, stream=false, stream_rate=0, show_tokens=false, temperature=1)
+        # A model with interior tables walks with a delimiter stack; an empty-
+        # interiors model takes the flat path below, byte-for-byte as before.
+        isempty(tensors.interiors) || return nested_decoder(tensors, max_tokens, stream, stream_rate, show_tokens, temperature)
         if max_tokens == 0
             return ""
         end
@@ -147,6 +150,103 @@ module Decoder
                     print(selected_token)
                 end
                 flush(stdout)
+            end
+        end
+
+        return stream ? nothing : join(text)
+    end
+
+    # The close glyph emitted when a class is force-closed at an interior
+    # dead-end. Parentheses close with ')'; the quote class with '"'.
+    const CLASS_CLOSE = Dict{Symbol,Char}(:paren => ')', :quote => '"')
+
+    # Stack-aware walk. The active table is the outer chain at depth zero, else
+    # the interior chain named by the top of the stack. After each token its
+    # characters update the stack via the shared classifier; a token-final quote,
+    # whose following character is not yet known, is decided by stack parity. At
+    # depth zero a dead-end ends the text; inside an interior a dead-end closes
+    # one level (emitting that close glyph) and retries. The truncation tail at
+    # max_tokens is left exactly as it falls, as an unfinished sentence would be.
+    function nested_decoder(tensors, max_tokens=128, stream=false, stream_rate=0, show_tokens=false, temperature=1)
+        if max_tokens == 0
+            return ""
+        end
+
+        text = []
+        outer = tensors.forward_markov
+        interiors = tensors.interiors
+        active = Set(keys(interiors))
+        current_id = tensors.vocabulary.token_to_id["<BOS>"]
+        stack = Symbol[]
+        prevchar = '\0'
+
+        delay = (stream && stream_rate > 0) ? 1 / stream_rate : 0
+
+        table() = isempty(stack) ? outer : interiors[stack[end]]
+
+        # Record a token in `text`; when streaming, print `display` (which carries
+        # the probability annotation under show_tokens) rather than the raw token.
+        function emit(s, display = s)
+            push!(text, s)
+            if stream
+                delay > 0 && sleep(delay)
+                print(display)
+                flush(stdout)
+            end
+        end
+
+        for i in 2:max_tokens
+            # Resolve dead-ends: inside an interior with nowhere to go, close one
+            # level and retry; at depth zero, stop.
+            dead = false
+            while !haskey(table(), current_id)
+                if isempty(stack)
+                    dead = true
+                    break
+                end
+                cls = pop!(stack)
+                g = CLASS_CLOSE[cls]
+                emit(string(g))
+                prevchar = g
+            end
+            dead && break
+
+            selected_id, prob = default_sampler(table(), current_id, temperature)
+            selected_token = tensors.vocabulary.id_to_token[selected_id]
+            current_id = selected_id
+
+            display = show_tokens ? selected_token * "\$$(prob)" : selected_token
+            emit(selected_token, display)
+
+            # Update the stack from the emitted token's characters. Collect to a
+            # Vector{Char} so the classifier can look one character ahead by index.
+            cs = collect(selected_token)
+            for j in eachindex(cs)
+                g = cs[j]
+                nxt = j < length(cs) ? cs[j+1] : '\0'
+                if g == '"' && nxt == '\0'
+                    # Token-final quote: the following character is not yet known.
+                    # Close an open quote (parity); otherwise open only when the
+                    # preceding character presents as an opening boundary, matching
+                    # the encoder's flanking rule. A quote hard against a letter
+                    # with nothing open is a stray close and is left alone.
+                    event, _ = delimiter_event(prevchar, g, '\0')
+                    if !isempty(stack) && stack[end] == :quote
+                        pop!(stack)
+                    elseif event != :close && :quote in active
+                        push!(stack, :quote)
+                    end
+                else
+                    event, class = delimiter_event(prevchar, g, nxt)
+                    if class in active
+                        if event == :open
+                            push!(stack, class)
+                        elseif event == :close && !isempty(stack) && stack[end] == class
+                            pop!(stack)
+                        end
+                    end
+                end
+                prevchar = g
             end
         end
 

@@ -55,7 +55,13 @@ module Types
     struct CompleteTensors
         header::Header
         vocabulary::Vocabulary
-    #   forward_markov::Dict{String, Dict{String, Float64}}
         forward_markov::Dict{Int, Dict{Int, Float64}}
+        # Per-class interior chains, keyed by delimiter class (:paren, :quote),
+        # over the same vocabulary as forward_markov. Empty for a flat model.
+        interiors::Dict{Symbol, Dict{Int, Dict{Int, Float64}}}
+        function CompleteTensors(header, vocabulary, forward_markov,
+                                 interiors = Dict{Symbol, Dict{Int, Dict{Int, Float64}}}())
+            new(header, vocabulary, forward_markov, interiors)
+        end
     end
 end

@@ -18,6 +18,7 @@ module Encoder
     - `preserve_tokens` (optional, default: [" ", "(", ")", "\\"", "*"]): Prevent tokenizer from breaking up these strings. (WIP)
     - `fragment_size` (optional, default: 1): How long (in characters) for tokens to be. Attempts to find optimal when set to 1. Only relevant if `mode` is "sanger".
     - `fragment_groups` (optional, default: 1): How many different fragment sizes should be parsed (high values not recommended). Only relevant if `mode` is "sanger" and `fragment_size` is specified - it's a feature, not a bug ;).
+    - `delimiters` (optional, default: [:paren, :quote]): Delimiter classes to route through their own interior chains. Pass `Symbol[]` for a flat model. Only relevant if `mode` is "sanger".
     - `verbose` (optional, default: true): Prints additional information (e.g. "Encoding in sanger mode" or "Encoded in \$s seconds")
     """
     function encode(
@@ -27,6 +28,7 @@ module Encoder
         exclude = String[],
         fragment_size = 1,
         fragment_groups = 1,
+        delimiters = [:paren, :quote],
         verbose = true
     )
         mode = lowercase(mode)
@@ -42,12 +44,12 @@ module Encoder
         verbose && println("Encoding in $mode mode.")
         initT = time()
 
-        markov_dict, token_to_id, id_to_token = sanger_encoder(context, fragment_size, fragment_groups, verbose)
+        markov_dict, interiors, token_to_id, id_to_token = sanger_encoder(context, fragment_size, fragment_groups, verbose, delimiters)
         args = "Fragmentation: $fragment_size by $fragment_groups."
 
         verbose && println("\nEncoded in $(time() - initT) s")
 
-        tensors = pack_ctensors(mode, args, markov_dict, token_to_id, id_to_token)
+        tensors = pack_ctensors(mode, args, markov_dict, token_to_id, id_to_token, interiors)
 
         return tensors
     end
@@ -105,46 +107,58 @@ module Encoder
         context,
         fragment_size = 1,
         fragment_groups = 1,
-        verbose = true
+        verbose = true,
+        delimiters = [:paren, :quote]
     )
-        #!isempty(exclude) ? context = replace(context, Regex(join(exclude, "|")) => " ") : nothing
-        #context = replace(context, "  " => " ")
-
         if fragment_size > 1
-            tokens = sanger_split(context, fragment_size, fragment_groups)
+            tokens, spans = sanger_split(context, fragment_size, fragment_groups)
         else
             fragment_size = Int(round(average_word_length(context), digits = 0))
-            tokens = sanger_split(context, fragment_size, fragment_groups)
+            tokens, spans = sanger_split(context, fragment_size, fragment_groups)
         end
 
-        # Build vocabulary
+        active = Set{Symbol}(delimiters)
+        classes = scan_depth_classes(context, active)
+
+        # Build vocabulary (shared across the outer and interior tables).
         unique_tokens = unique(tokens)
         pushfirst!(unique_tokens, "<BOS>")  # Ensure BOS is index 1
-        
         token_to_id = Dict(token => i for (i, token) in enumerate(unique_tokens))
         id_to_token = unique_tokens
-        
-        # Build numeric Markov chain
+
         markov_dict = Dict{Int, Dict{Int, Float64}}()
+        interiors = Dict{Symbol, Dict{Int, Dict{Int, Float64}}}()
         bos_id = token_to_id["<BOS>"]
         markov_dict[bos_id] = Dict{Int, Float64}()
-        
+
+        bump!(tbl, a, b) = begin
+            inner = get!(tbl, a, Dict{Int, Float64}())
+            inner[b] = get(inner, b, 0.0) + 1.0
+        end
+
         tokencount = length(tokens)
         for i in 1:tokencount-1
             current_id = token_to_id[tokens[i]]
             next_id = token_to_id[tokens[i+1]]
-            
-            if !haskey(markov_dict, current_id)
-                markov_dict[current_id] = Dict{Int, Float64}()
+
+            # The edge's context is the class just after token i's last character;
+            # a synthetic separator (span (0,0)) resets to the outer chain.
+            stop = spans[i][2]
+            cls = stop == 0 ? :outer : classes[stop]
+
+            if cls == :outer
+                bump!(markov_dict, current_id, next_id)
+            else
+                bump!(get!(interiors, cls, Dict{Int, Dict{Int, Float64}}()),
+                      current_id, next_id)
             end
-            markov_dict[current_id][next_id] = get(markov_dict[current_id], next_id, 0.0) + 1.0
-            
-            # Handle BOS transitions
+
+            # BOS transitions are seeded in the outer table only, as before.
             if i == 1 || endswith(tokens[i], "\n")
                 markov_dict[bos_id][next_id] = get(markov_dict[bos_id], next_id, 0.0) + 1.0
             end
         end
 
-        return markov_dict, token_to_id, id_to_token
+        return markov_dict, interiors, token_to_id, id_to_token
     end
 end

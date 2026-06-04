@@ -1,7 +1,57 @@
 module Utils
     using ..Types
 
-    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors
+    export average_word_length, sanger_split, recapitalise!, normalize_weights, default_sampler, merge_tensordicts, pack_ctensors, unpack_ctensors, merge_complete_tensors, delimiter_event, scan_depth_classes
+
+    # Characters that bound a quote: a missing neighbour, whitespace, brackets,
+    # and the punctuation a closing quote may sit against.
+    const QUOTE_BOUNDS = Set{Char}(['(', ')', '.', ',', ';', ':', '!', '?'])
+    isbound(c::Char) = c == '\0' || isspace(c) || c in QUOTE_BOUNDS
+
+    # Classify one delimiter occurrence, returning (event, class) with event in
+    # (:open, :close, :none) and class in (:paren, :quote, :none). Parentheses
+    # are directional. A double quote opens when its outer (preceding) side is a
+    # boundary and its inner (following) side is not, closes in the mirror case,
+    # and reads as an apostrophe (:none) when letters flank it. '\0' marks a
+    # missing neighbour at the start or end of the stream.
+    function delimiter_event(prev::Char, glyph::Char, nxt::Char)
+        glyph == '(' && return (:open, :paren)
+        glyph == ')' && return (:close, :paren)
+        if glyph == '"'
+            pb = isbound(prev)
+            nb = isbound(nxt)
+            pb && !nb && return (:open, :quote)
+            !pb && nb && return (:close, :quote)
+            return (:none, :none)
+        end
+        return (:none, :none)
+    end
+
+    # For each character position, the delimiter class in force just AFTER that
+    # character: :outer at depth zero, else the class on top of the stack. Only
+    # the classes named in `active` are treated as delimiters, so an empty
+    # `active` yields all :outer (the flat model). An unmatched close is ignored,
+    # for robustness on real-world text.
+    function scan_depth_classes(context::AbstractString, active::AbstractSet{Symbol})
+        cs = collect(context)
+        n = length(cs)
+        classes = Vector{Symbol}(undef, n)
+        stack = Symbol[]
+        for i in 1:n
+            prev = i > 1 ? cs[i-1] : '\0'
+            nxt = i < n ? cs[i+1] : '\0'
+            event, class = delimiter_event(prev, cs[i], nxt)
+            if class in active
+                if event == :open
+                    push!(stack, class)
+                elseif event == :close && !isempty(stack) && stack[end] == class
+                    pop!(stack)
+                end
+            end
+            classes[i] = isempty(stack) ? :outer : stack[end]
+        end
+        return classes
+    end
 
     function average_word_length(
         text::String,
@@ -19,34 +69,36 @@ module Utils
     end
 
     function sanger_split(context, fragment_size, fragment_groups = 1)
-        result = []
-        
-        # Do regular split (creates associations between fragments of the same group)
+        tokens = String[]
+        spans = Tuple{Int,Int}[]
+
+        # Regular split: associations between fragments of the same group.
         for group in 1:fragment_groups
-            push!(result, "\n")
-            group_array = sanger_split_base(context, fragment_size)
-            append!(result, group_array)
+            push!(tokens, "\n"); push!(spans, (0, 0))
+            toks, sps = sanger_split_base(context, fragment_size)
+            append!(tokens, toks); append!(spans, sps)
             fragment_size += 1
         end
-    
-        # Do alternating split (creates associations between fragments of different groups)
+
+        # Alternating split: associations between fragments of different groups.
         sizes = fragment_size:(fragment_size + fragment_groups - 1)
         if fragment_groups > 1
             for size1 in sizes
                 for size2 in sizes
                     if size1 != size2
-                        alt_array = sanger_split_alt(context, size1, size2)
-                        append!(result, alt_array)
+                        toks, sps = sanger_split_alt(context, size1, size2)
+                        append!(tokens, toks); append!(spans, sps)
                     end
                 end
             end
         end
-    
-        return result
+
+        return tokens, spans
     end
 
     function sanger_split_base(context, fragment_size)
-        result = Vector{String}()
+        tokens = String[]
+        spans = Tuple{Int,Int}[]
         chars = collect(context)
 
         for offset in 1:fragment_size
@@ -64,17 +116,18 @@ module Utils
                     break
                 end
 
-                token = join(chars[current_pos:end_pos])
-                push!(result, token)
+                push!(tokens, join(chars[current_pos:end_pos]))
+                push!(spans, (current_pos, end_pos))
                 current_pos += fragment_size
             end
         end
 
-        return result
+        return tokens, spans
     end
-    
+
     function sanger_split_alt(context, size1, size2)
-        result = String[]
+        tokens = String[]
+        spans = Tuple{Int,Int}[]
         chars = collect(context)
         n = length(chars)
         sizes = [size1, size2]
@@ -86,13 +139,14 @@ module Utils
             while current_pos < n
                 chunk_size = sizes[current_size_idx]
                 end_pos = min(current_pos + chunk_size - 1, n - 1)
-                push!(result, join(chars[(current_pos + 1):(end_pos + 1)]))
+                push!(tokens, join(chars[(current_pos + 1):(end_pos + 1)]))
+                push!(spans, (current_pos + 1, end_pos + 1))
                 current_pos += chunk_size
                 current_size_idx = 3 - current_size_idx
             end
         end
 
-        return result
+        return tokens, spans
     end
 
     function recapitalise!(text)
@@ -186,11 +240,12 @@ module Utils
     #    return ctensors
     #end
 
-    function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{Int, Dict{Int, Float64}}(), token_to_id = Dict{String, Int}(), id_to_token = Vector{String}())
+    function pack_ctensors(encoding_method = "unknown", metadata = "", forward_markov = Dict{Int, Dict{Int, Float64}}(), token_to_id = Dict{String, Int}(), id_to_token = Vector{String}(), interiors = Dict{Symbol, Dict{Int, Dict{Int, Float64}}}())
         ctensors = CompleteTensors(
             Header(encoding_method, metadata),
             Vocabulary(token_to_id, id_to_token),
-            forward_markov
+            forward_markov,
+            interiors
         )
 
         return ctensors
